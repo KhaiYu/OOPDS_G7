@@ -1,11 +1,36 @@
+/***********************************************************************
+CCP6124 Object-oriented Programming and Data Structures
+Trimester 2610
+Project: Virtual Machine and Assembly Language Interpreter
+
+Tutorial: TT8L
+Group: 7
+
+Member 1: 252UC2543V, Wong Haw Jack, WONG.HAW.JACK@student.mmu.edu.my
+Member 2: 252UC2546J, Chen Chee Chuen, CHEN.CHEE.CHUEN@student.mmu.edu.my
+Member 3: 252UC2528G, Tan Yi Da, TAN.YI.DA@student.mmu.edu.my
+Member 4: ... , Tan Khai Yu, TAN.KHAI.YU@student.mmu.edu.my
+
+This program strictly follow below program structure:
+- Custom Data Structures
+- Virtual Machine Architecture
+- Assembly Language Runner (Interpreter)
+- CPU
+- Runner
+
+************************************************************************/
+
 #include <iostream>
 #include <string>
 
-// SECTION 1: CUSTOM DATA STRUCTURES - VECTOR
+//*****************************************************************
+//              SECTION 1: CUSTOM DATA STRUCTURES
+//*****************************************************************
+// 1.1: SYSTEM VECTOR
 // Written by: Tan Khai Yu
 
 template <class DataType>
-class MyVector 
+class MyVector
 {
 private:
     DataType* arr;     // Box to hold our actual items
@@ -13,22 +38,22 @@ private:
     int current;       // Spaces we actually used right now
 
     // Grow the box size when it gets full
-    void resize() 
+    void resize()
     {
         int NewCapacity;
-        
-        if (capacity == 0) 
+
+        if (capacity == 0)
         {
             NewCapacity = 1;
         }
-        else 
+        else
         {
             NewCapacity = capacity * 2;
         }
 
         DataType* t = new DataType[NewCapacity];
 
-        for (int i = 0; i < current; i++) 
+        for (int i = 0; i < current; i++)
         {
             t[i] = arr[i];
         }
@@ -39,27 +64,27 @@ private:
     }
 
 public:
-    // Setup empty values at the start 
-    MyVector() 
+    // Setup empty values at the start
+    MyVector()
     {
         arr = nullptr;
         capacity = 0;
         current = 0;
     }
 
-    // Clear memory when program closes 
-    ~MyVector() 
+    // Clear memory when program closes
+    ~MyVector()
     {
-        if (arr != nullptr) 
+        if (arr != nullptr)
         {
             delete[] arr;
         }
     }
 
     // Put a new item to the back
-    void push_back(DataType data) 
+    void push_back(DataType data)
     {
-        if (current == capacity) 
+        if (current == capacity)
         {
             resize();
         }
@@ -68,99 +93,110 @@ public:
     }
 
     // Read data using standard brackets vec[i]
-    DataType& operator[](int i) 
+    DataType& operator[](int i)
     {
         return arr[i];
     }
 
-    // Return total items inside 
-    int size() const 
+    // Return total items inside
+    int size() const
     {
         return current;
     }
-}; 
+};
 
-// SECTION 2: SYSTEM STACK
+// 1.2: SYSTEM STACK
 // Written by: Tan Khai Yu
 
-class MyStack 
+class MyStack
 {
 private:
-    signed char storage[8]; // Fixed array to hold 8 bytes as required 
+    signed char storage[8]; // Fixed array to hold 8 bytes as required
     int topIndex;           // Tracks the top item position
 
 public:
     // Set stack as empty at first
-    MyStack() 
+    MyStack()
     {
-        topIndex = -1; 
+        topIndex = -1;
     }
 
-    // Put a new byte on top of the stack 
-    void push(signed char val) 
+    // Put a new byte on top of the stack
+    void push(signed char val)
     {
-        if (topIndex < 7) 
+        if (topIndex < 7)
         {
-            topIndex++;              
-            storage[topIndex] = val; 
+            topIndex++;
+            storage[topIndex] = val;
         }
     }
 
-    // Take the top item off the stack 
-    signed char pop() 
+    // Take the top item off the stack
+    signed char pop()
     {
-        // Crash program if try to pop empty stack as required 
-        if (topIndex < 0) 
+        // Crash program if try to pop empty stack as required
+        if (topIndex < 0)
         {
-            std::cerr << "Stack Underflow Error!" << std::endl; 
-            exit(1); 
+            std::cerr << "Stack Underflow Error!" << std::endl;
+            exit(1);
         }
-        
-        signed char val = storage[topIndex]; 
-        topIndex--;                          
-        return val;                          
+
+        signed char val = storage[topIndex];
+        topIndex--;
+        return val;
     }
 };
+// 1.3: SYSTEM QUEUE
+// Written By:
 
-// SECTION 3: HARDWARE REGISTERS
+class MyQueue{};
+
+
+//*****************************************************************
+//             SECTION 2: VIRTUAL MACHINE ARCHITECTURE
+//*****************************************************************
+//
+// 2.1: Register
 // Written by: Tan Khai Yu
-
-// Base class for registers 
-class Register 
+// Base class register
+class Register
 {
-protected:
-    signed char value; // 1-byte register data slot 
+private:
+    signed char value; // 1-byte register data slot
 
 public:
     // Setup starting value to 0
-    Register() 
+    Register()
     {
         value = 0;
     }
-    
+
     virtual ~Register() {}
 
-    // Method to update register data 
-    void setValue(signed char val) 
+    // Method to update register data
+    void setValue(signed char val)
     {
         value = val;
     }
 
-    // Method to read register data 
-    signed char getValue() const 
+    // Method to read register data
+    signed char getValue() const
     {
         return value;
     }
 };
 
-// Derived class for R0-R7 registers 
+// Derived class for R0-R7 registers
 class GeneralRegister : public Register {};
 
-// SECTION 4: FLAG REGISTER STATUS
-// Written by: Tan Khai Yu
+// 2.2: Program Counter
+// Written by:
+class ProgramCounter{};
 
-// Manages CF, ZF, UF, OF bits 
-class FlagRegister 
+// 2.3: Flags
+// Written by: Tan Khai Yu
+// Manages CF, ZF, UF, OF bits
+class FlagRegister
 {
 private:
     bool CF; // Carry Flag
@@ -170,7 +206,7 @@ private:
 
 public:
     // Reset all flags to false initially
-    FlagRegister() 
+    FlagRegister()
     {
         CF = false;
         ZF = false;
@@ -178,69 +214,96 @@ public:
         OF = false;
     }
 
-    // Update methods for flags 
+    // Update methods for flags
     void setCF(bool b) { CF = b; }
     void setZF(bool b) { ZF = b; }
     void setUF(bool b) { UF = b; }
     void setOF(bool b) { OF = b; }
 
-    // Read methods for checking flags 
+    // Read methods for checking flags
     bool getCF() const { return CF; }
     bool getZF() const { return ZF; }
     bool getUF() const { return UF; }
     bool getOF() const { return OF; }
 };
 
-// SECTION 5: MAIN MEMORY (64 BYTES)
+// 2.4: Memory(64 BYTES)
 // Written by: Tan Khai Yu
 
-// Handles storage over 64 bytes 
-class Memory 
+// Handles storage over 64 bytes
+class Memory
 {
 private:
-    signed char storage[64]; // Fixed size 64-byte array 
+    signed char storage[64]; // Fixed size 64-byte array
 
 public:
     // Fill all memory space with 0 at first
-    Memory() 
+    Memory()
     {
-        for (int i = 0; i < 64; i++) 
+        for (int i = 0; i < 64; i++)
         {
-            storage[i] = 0; 
+            storage[i] = 0;
         }
     }
 
     // Write data to an address
-    void write(int address, signed char val) 
+    void write(int address, signed char val)
     {
-        if (address >= 0 && address < 64) 
+        if (address >= 0 && address < 64)
         {
             storage[address] = val;
         }
     }
 
     // Read data from an address
-    signed char read(int address) const 
+    signed char read(int address) const
     {
-        if (address >= 0 && address < 64) 
+        if (address >= 0 && address < 64)
         {
             return storage[address];
         }
-        return 0; 
+        return 0;
     }
 };
-
-// SECTION 6: INSTRUCTION BASE CLASS
+//*****************************************************************
+//            SECTION 3: Assembly Language Interpreter
+//*****************************************************************
+// 3.1: Instruction (Base Class)
 // Written by: Tan Khai Yu
+// Abstract base class for commands
 
 class CPU; // Forward declaration
-
-// Abstract base class for commands
-class Instruction 
+class Instruction
 {
 public:
     virtual ~Instruction() {}
-    
+
     // Pure virtual function for polymorphism
-    virtual void execute(CPU& cpu) = 0; 
+    virtual void execute(CPU& cpu) = 0;
 };
+// 3.2: Input Operations
+// 3.3: Output Operations
+// 3.4: MOV Operations
+// 3.5: Arithmetic Operations
+// 3.6: Increment and Decrement Operations
+// 3.7: ROL Operations
+// 3.8: ROR Operations
+// 3.9: Shift Operations
+// 3.10: Load and Store Operations
+// 3.11: Flag Reset Instruction
+// 3.12: Stack Operations
+
+//*****************************************************************
+//                         SECTION 4: CPU
+//*****************************************************************
+
+class CPU; // Forward declaration
+
+//*****************************************************************
+//                       SECTION 5: Runner
+//*****************************************************************
+
+int main()
+{
+    return 0;
+}
