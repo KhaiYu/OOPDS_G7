@@ -1,0 +1,4 @@
+# Ignore object file
+*.o
+*.exe
+Project
