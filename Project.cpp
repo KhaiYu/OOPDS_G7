@@ -9,7 +9,7 @@ Group: 7
 Member 1: 252UC2543V, Wong Haw Jack, WONG.HAW.JACK@student.mmu.edu.my
 Member 2: 252UC2546J, Chen Chee Chuen, CHEN.CHEE.CHUEN@student.mmu.edu.my
 Member 3: 252UC2528G, Tan Yi Da, TAN.YI.DA@student.mmu.edu.my
-Member 4: ... , Tan Khai Yu, TAN.KHAI.YU@student.mmu.edu.my
+Member 4: 253UC256L3, Tan Khai Yu, TAN.KHAI.YU@student.mmu.edu.my
 
 This program strictly follow below program structure:
 - Custom Data Structures
@@ -271,8 +271,7 @@ public:
 // 3.1: Instruction (Base Class)
 // Written by: Tan Khai Yu
 // Abstract base class for commands
-
-class CPU; // Forward declaration
+class CPU;
 class Instruction
 {
 public:
@@ -290,14 +289,112 @@ public:
 // 3.8: ROR Operations
 // 3.9: Shift Operations
 // 3.10: Load and Store Operations
+
 // 3.11: Flag Reset Instruction
+//Written by :Tan Khai Yu
+class RESET : public Instruction
+{
+private:
+    char FlagType;
+public:
+    RESET(char Type): FlagType(Type){}
+    void execute(CPU& cpu)
+    {
+        FlagRegister& flags = cpu.getFlags();
+        switch (FlagType)
+        {
+        case 'C':
+        {
+            flags.setCF(false);
+        }
+            break;
+        case 'Z':
+        {
+            flags.setZF(false);
+        }
+            break;
+        case 'U':
+        {
+            flags.setUF(false);
+        }
+            break;
+        case 'O':
+        {
+            flags.setOF(false);
+        }
+            break;
+        default:
+        break;
+        }
+    }
+};
 // 3.12: Stack Operations
+//Written by:Tan Khai Yu
+class PUSH: public Instruction{
+    private:
+     int Source_Reg;
+    public:
+    PUSH(int Reg):Source_Reg(Reg){}
+    void execute(CPU& cpu){
+        signed char value = cpu.getReg(Source_Reg);
+        cpu.pushStack(value);
+    }
+};
+class POP : public Instruction{
+    private:
+     int Destination_Reg;
+    public:
+    POP(int Reg):Destination_Reg(Reg){}
+    void execute(CPU& cpu){
+        signed char value = cpu.popStack();
+         cpu.setReg(Destination_Reg, value);
+    }   
+};
 
 //*****************************************************************
 //                         SECTION 4: CPU
 //*****************************************************************
 
-class CPU; // Forward declaration
+class CPU {
+private:
+    FlagRegister flags;
+    GeneralRegister regs[8];   
+    MyStack stack;             
+    unsigned char si;          
+
+public:
+    CPU() : si(0) {}
+
+    FlagRegister& getFlags() 
+    { 
+        return flags; 
+    }
+
+
+    signed char getReg(int idx) const {
+        if (idx >= 0 && idx < 8)
+            return regs[idx].getValue();
+        return 0;
+    }
+    void setReg(int idx, signed char val) {
+        if (idx >= 0 && idx < 8)
+            regs[idx].setValue(val);
+    }
+
+
+    void pushStack(signed char val) {
+        stack.push(val);
+        si++;
+    }
+    signed char popStack() {
+        if (si == 0) {
+            std::cerr << "Stack Underflow Error!" << std::endl;
+            exit(1);
+        }
+        si--;
+        return stack.pop();
+    }
+};
 
 //*****************************************************************
 //                       SECTION 5: Runner
