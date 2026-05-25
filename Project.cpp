@@ -15,7 +15,6 @@ This program strictly follow below program structure:
 - Custom Data Structures
 - Virtual Machine Architecture
 - Assembly Language Runner (Interpreter)
-- CPU
 - Runner
 
 ************************************************************************/
@@ -145,6 +144,8 @@ public:
         topIndex--;
         return val;
     }
+
+    int get_top_index() {return topIndex;}
 };
 // 1.3: SYSTEM QUEUE
 // Written By:
@@ -161,7 +162,7 @@ class MyQueue{};
 // Base class register
 class Register
 {
-private:
+protected:
     signed char value; // 1-byte register data slot
 
 public:
@@ -180,7 +181,7 @@ public:
     }
 
     // Method to read register data
-    signed char getValue() const
+    signed char const getValue()
     {
         return value;
     }
@@ -188,6 +189,19 @@ public:
 
 // Derived class for R0-R7 registers
 class GeneralRegister : public Register {};
+
+class StackIndexRegister : public Register
+{
+public:
+    void push()
+    {
+        value++;
+    }
+    void pop()
+    {
+        value--;
+    }
+};
 
 // 2.2: Program Counter
 // Written by:
@@ -265,13 +279,60 @@ public:
         return 0;
     }
 };
+
+//2.5 CPU
+//Written By Tan Khai YU / Wong Haw Jack
+class CPU {
+private:
+    GeneralRegister r[8];
+    Memory cpu_memory;
+
+    FlagRegister* ptr_flag = new FlagRegister();
+    ProgramCounter pc;
+    MyStack stack;
+    StackIndexRegister stack_index;
+
+public:
+    CPU() : stack_index() {}
+    ~CPU() {delete ptr_flag;}
+
+    FlagRegister* getFlags()
+    {
+        return ptr_flag;
+    }
+
+    signed char const getReg(int idx) {
+        if (idx >= 0 && idx < 8)
+            return r[idx].getValue();
+        return 0;
+    }
+    void setReg(int idx, signed char val) {
+        if (idx >= 0 && idx < 8)
+            r[idx].setValue(val);
+    }
+
+
+    void pushStack(signed char val) {
+        stack.push(val);
+        stack_index.push();
+    }
+    signed char popStack() {
+        if (stack_index.getValue() == 0) {
+            std::cerr << "Stack Underflow Error!" << std::endl;
+            exit(1);
+        }
+        stack_index.pop();
+        return stack.pop();
+    }
+
+};
+// Forward declaration;
 //*****************************************************************
 //            SECTION 3: Assembly Language Interpreter
 //*****************************************************************
 // 3.1: Instruction (Base Class)
 // Written by: Tan Khai Yu
 // Abstract base class for commands
-class CPU;
 class Instruction
 {
 public:
@@ -280,8 +341,58 @@ public:
     // Pure virtual function for polymorphism
     virtual void execute(CPU& cpu) = 0;
 };
+
 // 3.2: Input Operations
 // 3.3: Output Operations
+// Written by: Wong Haw Jack
+class IOInstruction: public Instruction
+{
+public:
+    int register_index;
+};
+
+class Input: public IOInstruction
+{
+    /***
+    When executed, your interpreter must print a single '?' character at the start of a new line to signal it is waiting for user input.
+    Input Validation: You must handle bounds validation manually.
+    If the user types a value outside the signed 8-bit range (<-128 or >127), your logic must catch it and explicitly
+    flip the Underflow Flag (UF) or Overflow Flag (OF) in the CPU.
+    The Zero Flag (ZF): Pay very close attention to the requirement for the Zero Flag,
+    If the input has an ASCII code equal to 0, the ZF flag must be set to true.
+    ***/
+
+public:
+    Input(int r)
+    {
+        register_index = r;
+    }
+    void execute(CPU& cpu) override
+    {
+        int input;
+        std::cout << "?" << std::endl;
+        std::cin >> input;
+        static_cast<signed char>(input);
+        cpu.setReg(register_index, input);
+        if(input > 127) {cpu.getFlags()->setOF(true);}
+        else if(input < -128) {cpu.getFlags()->setUF(true);}
+        else if(input == 0) {cpu.getFlags()->setZF(true);}
+    }
+
+};
+
+class Display: public IOInstruction
+{
+public:
+    Display(int r)
+    {
+        register_index = r;
+    }
+    void execute(CPU& cpu) override
+    {
+        std::cout << int(cpu.getReg(register_index));
+    }
+};
 // 3.4: MOV Operations
 // 3.5: Arithmetic Operations
 // 3.6: Increment and Decrement Operations
@@ -298,29 +409,29 @@ private:
     char FlagType;
 public:
     RESET(char Type): FlagType(Type){}
-    void execute(CPU& cpu)
+    void execute(CPU& cpu) override
     {
-        FlagRegister& flags = cpu.getFlags();
+        FlagRegister* flags = cpu.getFlags();
         switch (FlagType)
         {
         case 'C':
         {
-            flags.setCF(false);
+            flags->setCF(false);
         }
             break;
         case 'Z':
         {
-            flags.setZF(false);
+            flags->setZF(false);
         }
             break;
         case 'U':
         {
-            flags.setUF(false);
+            flags->setUF(false);
         }
             break;
         case 'O':
         {
-            flags.setOF(false);
+            flags->setOF(false);
         }
             break;
         default:
@@ -348,59 +459,90 @@ class POP : public Instruction{
     void execute(CPU& cpu){
         signed char value = cpu.popStack();
          cpu.setReg(Destination_Reg, value);
-    }   
-};
-
-//*****************************************************************
-//                         SECTION 4: CPU
-//*****************************************************************
-
-class CPU {
-private:
-    FlagRegister flags;
-    GeneralRegister regs[8];   
-    MyStack stack;             
-    unsigned char si;          
-
-public:
-    CPU() : si(0) {}
-
-    FlagRegister& getFlags() 
-    { 
-        return flags; 
-    }
-
-
-    signed char getReg(int idx) const {
-        if (idx >= 0 && idx < 8)
-            return regs[idx].getValue();
-        return 0;
-    }
-    void setReg(int idx, signed char val) {
-        if (idx >= 0 && idx < 8)
-            regs[idx].setValue(val);
-    }
-
-
-    void pushStack(signed char val) {
-        stack.push(val);
-        si++;
-    }
-    signed char popStack() {
-        if (si == 0) {
-            std::cerr << "Stack Underflow Error!" << std::endl;
-            exit(1);
-        }
-        si--;
-        return stack.pop();
     }
 };
 
 //*****************************************************************
-//                       SECTION 5: Runner
+//                       SECTION 4: Runner
 //*****************************************************************
+
 
 int main()
 {
+    /***
+    Below is just for bug testing!!!
+    These are NOT actual code.
+    Feel free to make changes for debugging purpose.
+    ***/
+    std::cout << "========================================" << std::endl;
+    std::cout << " RUNNING VIRTUAL MACHINE TEST SUITE     " << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    CPU myCpu;
+
+    //---------------------------------------------------------
+    // TEST 1: Register Boundary & Explicit IO Flag Manipulations
+    //---------------------------------------------------------
+    std::cout << "\n[TEST 1] Testing IO boundaries & Flags..." << std::endl;
+
+    // Test Input Instruction (Normal range)
+    // Run this manually: Type '55' when prompted
+    Instruction* inputNormal = new Input(0); // Targets R0
+    std::cout << "-> Enter '55' to test normal assignment:" << std::endl;
+    inputNormal->execute(myCpu);
+
+    Instruction* displayR0 = new Display(0);
+    std::cout << "Value inside R0 is: ";
+    displayR0->execute(myCpu);
+    std::cout << std::endl;
+
+    // Test Input Instruction (Overflow boundary trigger)
+    // Run this manually: Type '200' when prompted (Exceeds signed char 127)
+    Instruction* inputOverflow = new Input(1); // Targets R1
+    std::cout << "-> Enter '200' to test Overflow Flag trigger:" << std::endl;
+    inputOverflow->execute(myCpu);
+
+    std::cout << "Overflow Flag (OF) state (Expected 1): " << myCpu.getFlags()->getOF() << std::endl;
+
+    //---------------------------------------------------------
+    // TEST 2: Reset Flag Instruction
+    //---------------------------------------------------------
+    std::cout << "\n[TEST 2] Testing RESET instruction..." << std::endl;
+
+    Instruction* resetOF = new RESET('O');
+    resetOF->execute(myCpu);
+    std::cout << "Overflow Flag (OF) state after RESET (Expected 0): " << myCpu.getFlags()->getOF() << std::endl;
+
+    //---------------------------------------------------------
+    // TEST 3: Stack Operations (PUSH & POP)
+    //---------------------------------------------------------
+    std::cout << "\n[TEST 3] Testing Stack Operations..." << std::endl;
+
+    // Prepare values via direct set methods to bypass std::cin during structural tests
+    myCpu.setReg(2, 42);  // Place 42 into R2
+    myCpu.setReg(3, 0);   // Clear R3
+
+    Instruction* pushR2 = new PUSH(2); // Push R2 (42) onto stack
+    Instruction* popR3 = new POP(3);   // Pop top stack value into R3
+
+    pushR2->execute(myCpu);
+    popR3->execute(myCpu);
+
+    std::cout << "Value transferred to R3 via Stack (Expected 42): " << (int)myCpu.getReg(3) << std::endl;
+
+    //---------------------------------------------------------
+    // CLEANUP
+    //---------------------------------------------------------
+    delete inputNormal;
+    delete displayR0;
+    delete inputOverflow;
+    delete resetOF;
+    delete pushR2;
+    delete popR3;
+
+    std::cout << "\n========================================" << std::endl;
+    std::cout << " TEST SUITE COMPLETE                     " << std::endl;
+    std::cout << "========================================" << std::endl;
+
     return 0;
 }
