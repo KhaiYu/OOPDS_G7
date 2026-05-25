@@ -15,7 +15,6 @@ This program strictly follow below program structure:
 - Custom Data Structures
 - Virtual Machine Architecture
 - Assembly Language Runner (Interpreter)
-- CPU
 - Runner
 
 ************************************************************************/
@@ -145,6 +144,8 @@ public:
         topIndex--;
         return val;
     }
+
+    int get_top_index() {return topIndex;}
 };
 // 1.3: SYSTEM QUEUE
 // Written By:
@@ -265,6 +266,26 @@ public:
         return 0;
     }
 };
+
+class CPU
+{
+public:
+    GeneralRegister r[8];
+    Memory cpu_memory;
+
+    FlagRegister* ptr_flag = new FlagRegister();
+    ProgramCounter pc;
+    Register stack_index;
+
+    MyStack cpu_stack;
+
+    ~CPU()
+    {
+        delete ptr_flag;
+    }
+
+};
+// Forward declaration;
 //*****************************************************************
 //            SECTION 3: Assembly Language Interpreter
 //*****************************************************************
@@ -272,7 +293,6 @@ public:
 // Written by: Tan Khai Yu
 // Abstract base class for commands
 
-class CPU; // Forward declaration
 class Instruction
 {
 public:
@@ -281,8 +301,58 @@ public:
     // Pure virtual function for polymorphism
     virtual void execute(CPU& cpu) = 0;
 };
+
 // 3.2: Input Operations
 // 3.3: Output Operations
+// Written by: Wong Haw Jack
+class IOInstruction: public Instruction
+{
+public:
+    int register_index;
+};
+
+class Input: public IOInstruction
+{
+    /***
+    When executed, your interpreter must print a single '?' character at the start of a new line to signal it is waiting for user input.
+    Input Validation: You must handle bounds validation manually.
+    If the user types a value outside the signed 8-bit range (<-128 or >127), your logic must catch it and explicitly
+    flip the Underflow Flag (UF) or Overflow Flag (OF) in the CPU.
+    The Zero Flag (ZF): Pay very close attention to the requirement for the Zero Flag,
+    If the input has an ASCII code equal to 0, the ZF flag must be set to true.
+    ***/
+
+public:
+    Input(int r)
+    {
+        register_index = r;
+    }
+    void execute(CPU& cpu) override
+    {
+        int input;
+        std::cout << "?" << std::endl;
+        std::cin >> input;
+        static_cast<signed char>(input);
+        cpu.r[register_index].setValue(input);
+        if(input > 127) {cpu.ptr_flag->setOF(true);}
+        else if(input < -128) {cpu.ptr_flag->setUF(true);}
+        else if(input == 0) {cpu.ptr_flag->setZF(true);}
+    }
+
+};
+
+class Display: public IOInstruction
+{
+public:
+    Display(int r)
+    {
+        register_index = r;
+    }
+    void execute(CPU& cpu) override
+    {
+        std::cout << int(cpu.r[register_index].getValue());
+    }
+};
 // 3.4: MOV Operations
 // 3.5: Arithmetic Operations
 // 3.6: Increment and Decrement Operations
@@ -293,11 +363,6 @@ public:
 // 3.11: Flag Reset Instruction
 // 3.12: Stack Operations
 
-//*****************************************************************
-//                         SECTION 4: CPU
-//*****************************************************************
-
-class CPU; // Forward declaration
 
 //*****************************************************************
 //                       SECTION 5: Runner
@@ -305,5 +370,31 @@ class CPU; // Forward declaration
 
 int main()
 {
+//test case
+    CPU myCpu;
+//    myCpu.r[0].setValue(129);
+//    std::cout << int(myCpu.r[0].getValue()) << std::endl;
+//    std::cout << int(myCpu.stack_index.getValue()) << std::endl;
+//
+//    std::cout << myCpu.ptr_flag->getOF() << std::endl;
+//    std::cout << myCpu.ptr_flag->getUF() << std::endl;
+//    std::cout << myCpu.ptr_flag->getCF() << std::endl;
+//    std::cout << myCpu.ptr_flag->getZF() << std::endl;
+//
+//    myCpu.cpu_stack.push(10);
+//    myCpu.cpu_stack.push(20);
+//    myCpu.cpu_stack.push(30);
+//
+//    std::cout << myCpu.cpu_stack.get_top_index() << std::endl;
+//
+//    myCpu.cpu_stack.pop();
+//
+//    std::cout << myCpu.cpu_stack.get_top_index() << std::endl;
+//
+    Instruction* instruct1 = new Input(0);
+    Instruction* instruct2 = new Display(0);
+    instruct1->execute(myCpu);
+    instruct2->execute(myCpu);
+
     return 0;
 }
