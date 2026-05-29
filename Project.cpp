@@ -294,7 +294,18 @@ private:
 
 public:
     CPU() : stack_index() {}
+
     ~CPU() {delete ptr_flag;}
+
+    signed char readMemory(int address)
+    {
+        return cpu_memory.read(address);
+    }
+
+    void writeMemory(int address, signed char value)
+    {
+        cpu_memory.write(address, value);
+    }
 
     FlagRegister* getFlags()
     {
