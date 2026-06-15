@@ -317,7 +317,7 @@ public:
         return ptr_flag;
     }
 
-    signed char const getReg(int idx) {
+    signed char getReg(int idx) const {
         if (idx >= 0 && idx < 8)
             return r[idx].getValue();
         return 0;
@@ -340,7 +340,6 @@ public:
         stack_index.pop();
         return stack.pop();
     }
-
 };
 // Forward declaration;
 //*****************************************************************
@@ -410,6 +409,7 @@ public:
     }
 };
 // 3.4: MOV Operations
+// Written by: Tan Yi Da
 class MovOperation:public Instruction
 {
 private:
@@ -457,8 +457,136 @@ public:
     };
 
 };
-
 // 3.5: Arithmetic Operations
+// Written by: Wong Haw Jack
+class Arithmetic: public Instruction
+{
+private:
+    int source_reg;
+    int destination_reg;
+
+public:
+    Arithmetic(int d, int s): source_reg(s), destination_reg(d){}
+
+    int get_source_reg() const {return source_reg;}
+    int get_destination_reg() const {return destination_reg;}
+};
+
+class ADD: public Arithmetic
+{
+public:
+    ADD(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(source_value) + int(dest_value);
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result = u_dest_value + u_source_value;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
+
+class SUB: public Arithmetic
+{
+public:
+    SUB(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(dest_value) - int(source_value);
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result = u_dest_value - u_source_value;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
+
+class MUL: public Arithmetic
+{
+public:
+    MUL(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(dest_value) * int(source_value);
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result = u_dest_value * u_source_value;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
+
+class DIV: public Arithmetic
+{
+public:
+    DIV(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(dest_value) / int(source_value) ;
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result =  u_dest_value / u_source_value ;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
 // 3.6: Increment and Decrement Operations
 // Written by: Chen Chee Chuen
 class INC : public Instruction
@@ -552,7 +680,88 @@ public:
 
 // 3.7: ROL Operations
 // 3.8: ROR Operations
+// Written by Jack Wong
+class Rotate : public Instruction
+{
+private:
+    int destination_reg;
+    int count;
+
+public:
+    Rotate(int d, int c)
+    {
+        destination_reg = d;
+        count = c;
+    }
+
+    int get_dest_reg() const {return destination_reg;}
+    int get_count() const {return count;}
+};
+
+class ROL : public Rotate
+{
+public:
+    ROL(int d, int c) : Rotate(d, c){}
+
+    void execute(CPU& cpu)
+    {
+        int destination_index = get_dest_reg();
+        int count = get_count();
+
+        count %= 8;
+
+        signed char signed_before_ro = cpu.getReg(destination_index);
+        unsigned char unsigned_before_ro = static_cast<unsigned char>(signed_before_ro);
+
+        unsigned char unsigned_after_ro = 0;
+        if (count == 0)
+        {
+            unsigned_after_ro = unsigned_before_ro;
+        }
+        else
+        {
+            unsigned_after_ro = (unsigned_before_ro << count) | (unsigned_before_ro >> (8 - count));
+        }
+        signed char signed_after_ro = static_cast<signed char>(unsigned_after_ro);
+
+        cpu.setReg(destination_index, signed_after_ro);
+
+        cpu.getFlags()->setZF(signed_after_ro == 0);
+    }
+};
+class ROR : public Rotate
+{
+public:
+    ROR(int d, int c) : Rotate(d, c){}
+
+    void execute(CPU& cpu)
+    {
+        int destination_index = get_dest_reg();
+        int count = get_count();
+
+        count %= 8;
+
+        signed char signed_before_ro = cpu.getReg(destination_index);
+        unsigned char unsigned_before_ro = static_cast<unsigned char>(signed_before_ro);
+
+        unsigned char unsigned_after_ro = 0;
+        if (count == 0)
+        {
+            unsigned_after_ro = unsigned_before_ro;
+        }
+        else
+        {
+            unsigned_after_ro = (unsigned_before_ro >> count) | (unsigned_before_ro << (8 - count));
+        }
+        signed char signed_after_ro = static_cast<signed char>(unsigned_after_ro);
+
+        cpu.setReg(destination_index, signed_after_ro);
+
+        cpu.getFlags()->setZF(signed_after_ro == 0);
+    }
+};
 // 3.9: Shift Operations
+// Written By: Tan Yi Da
 class SftOperation:public Instruction
 {
     private:
@@ -710,7 +919,7 @@ private:
 
 public:
     RESET(char Type) : FlagType(Type) {}
-    
+
     void execute(CPU& cpu) override
     {
         FlagRegister* flags = cpu.getFlags();
@@ -735,7 +944,7 @@ private:
 
 public:
     PUSH(int Reg) : Source_Reg(Reg) {}
-    
+
     void execute(CPU& cpu)
     {
         signed char value = cpu.getReg(Source_Reg);
@@ -751,7 +960,7 @@ private:
 
 public:
     POP(int Reg) : Destination_Reg(Reg) {}
-    
+
     void execute(CPU& cpu)
     {
         signed char value = cpu.popStack();  // Pop from stack
@@ -854,7 +1063,7 @@ int main()
 
         Instruction* pushR0 = new PUSH(0);
         Instruction* pushR1 = new PUSH(1);
-        Instruction* pushR2 = new PUSH(2); 
+        Instruction* pushR2 = new PUSH(2);
         Instruction* pushR3 = new PUSH(3);
 
         pushR0->execute(myCpu);
@@ -875,14 +1084,14 @@ int main()
         popR7->execute(myCpu);
 
         std::cout << "Popped into R4,R5,R6,R7 (Expected LIFO: 40,30,20,10)" << std::endl;
-        std::cout << "Result: R4=" << (int)myCpu.getReg(4) 
+        std::cout << "Result: R4=" << (int)myCpu.getReg(4)
                   << " R5=" << (int)myCpu.getReg(5)
                   << " R6=" << (int)myCpu.getReg(6)
                   << " R7=" << (int)myCpu.getReg(7) << std::endl;
 
-        bool lifoCorrect = ((int)myCpu.getReg(4) == 40 && 
-                            (int)myCpu.getReg(5) == 30 && 
-                            (int)myCpu.getReg(6) == 20 && 
+        bool lifoCorrect = ((int)myCpu.getReg(4) == 40 &&
+                            (int)myCpu.getReg(5) == 30 &&
+                            (int)myCpu.getReg(6) == 20 &&
                             (int)myCpu.getReg(7) == 10);
 
         if(lifoCorrect) {
@@ -914,7 +1123,7 @@ int main()
         flags->setUF(true);
         flags->setOF(true);
 
-        std::cout << "Before RESET - CF:" << flags->getCF() 
+        std::cout << "Before RESET - CF:" << flags->getCF()
                   << " ZF:" << flags->getZF()
                   << " UF:" << flags->getUF()
                   << " OF:" << flags->getOF() << " (Expected: 1 1 1 1)" << std::endl;
