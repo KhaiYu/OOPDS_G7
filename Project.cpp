@@ -193,6 +193,11 @@ class GeneralRegister : public Register {};
 class StackIndexRegister : public Register
 {
 public:
+    StackIndexRegister()
+    {
+        value = 0;
+
+    }
     void push()
     {
         value++;
@@ -294,7 +299,18 @@ private:
 
 public:
     CPU() : stack_index() {}
+
     ~CPU() {delete ptr_flag;}
+
+    signed char readMemory(int address)
+    {
+        return cpu_memory.read(address);
+    }
+
+    void writeMemory(int address, signed char value)
+    {
+        cpu_memory.write(address, value);
+    }
 
     FlagRegister* getFlags()
     {
@@ -393,7 +409,54 @@ public:
     }
 };
 // 3.4: MOV Operations
+// Written by: Tan Yi Da
+class MovOperation:public Instruction
+{
+private:
+int mov_mode; //MOV mode(1.R1,10 / 2.R1,R0 / 3.R1,[R2])
+int destination; //destination of register
+int source; // which register to MOV to the destination
+signed char number; //number (-128 to 127) to MOV to destination
 
+public:
+    MovOperation(int dest, signed char num)
+    {
+        mov_mode=0;
+        destination=dest;
+        number=num;
+    }
+    MovOperation(int dest, int src) //same with mode 2
+    {
+        mov_mode=1;
+        destination=dest;
+        source=src;
+        }
+    MovOperation(int dest, int src, int nums) //same with mode 1 but have int num is just to differentiate mode 1 and 2
+    {
+        mov_mode=2;
+        destination=dest;
+        source=src;
+    }
+    void execute(CPU& cpu)
+    {
+        switch(mov_mode)
+        {
+        case 0:
+            cpu.register[destination].setValue(number);//still need to modify
+        break;
+        case 1:
+            cpu.register[destination].setValue(source);//still need to modify
+        break;
+        case 2:
+            cpu.register[destination].setValue(memory.read(address));//still need to modify
+        break;
+        default:
+            cout<<"You cant MOVE this!!!"<<endl;
+            return;//still need to use class Flag
+        }
+    };
+
+};
 // 3.5: Arithmetic Operations
 // Written by: Wong Haw Jack
 class Arithmetic: public Instruction
@@ -525,6 +588,96 @@ public:
     }
 };
 // 3.6: Increment and Decrement Operations
+// Written by: Chen Chee Chuen
+class INC : public Instruction
+{
+private:
+    int reg;
+
+public:
+    INC(int r)
+    {
+        reg = r;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int result = cpu.getReg(reg) + 1;
+
+        // Reset Flags
+        cpu.getFlags()->setOF(false);
+        cpu.getFlags()->setUF(false);
+        cpu.getFlags()->setZF(false);
+        cpu.getFlags()->setCF(false);
+
+        // Overflow
+        if(result > 127)
+        {
+            cpu.getFlags()->setOF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        // Underflow
+        if(result < -128)
+        {
+            cpu.getFlags()->setUF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        if((signed char)result == 0)
+        {
+            cpu.getFlags()->setZF(true);
+        }
+
+        cpu.setReg(reg, (signed char)result);
+    }
+};
+
+class DEC : public Instruction
+{
+private:
+    int reg;
+
+public:
+    DEC(int r)
+    {
+        reg = r;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int result = cpu.getReg(reg) - 1;
+
+        // Reset Flags
+        cpu.getFlags()->setOF(false);
+        cpu.getFlags()->setUF(false);
+        cpu.getFlags()->setZF(false);
+        cpu.getFlags()->setCF(false);
+
+        // Overflow
+        if(result > 127)
+        {
+            cpu.getFlags()->setOF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        // Underflow
+        if(result < -128)
+        {
+            cpu.getFlags()->setUF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        // Zero Flag
+        if((signed char)result == 0)
+        {
+            cpu.getFlags()->setZF(true);
+        }
+
+        cpu.setReg(reg, (signed char)result);
+    }
+};
+
 // 3.7: ROL Operations
 // 3.8: ROR Operations
 // Written by Jack Wong
@@ -608,75 +761,405 @@ public:
     }
 };
 // 3.9: Shift Operations
+// Written By: Tan Yi Da
+class SftOperation:public Instruction
+{
+    private:
+        int sft_mode;
+        int sft_num;
+        int destination;
+    public:
+        SftOperation(int dest,int Count,int mode)
+        {
+            sft_mode=mode;
+            destination=dest;
+            sft_num=Count;
+    }
+    void execute(CPU& cpu)
+    {
+        switch(sft_mode)
+        {
+            case 0: //case 0 is SHL
+            for(int i=0; i<sft_num;i++)
+            {
+                signed char val=cpu.registers[destination].getValue();
+                val *=2;
+                cpu.write[destination].setValue(val);
+            }
+            break;
+
+            case 1: //case 0 is SHR
+            for(int i=0; i<sft_num;i++)
+            {
+                signed char val=cpu.registers[destination].getValue();
+                val /=2;
+                cpu.write[destination].setValue(val);
+            }
+            break;
+        }
+    }
+};
+
+
+
 // 3.10: Load and Store Operations
+// Written by: Chen Chee Chuen
+class LOAD : public Instruction  //Direct LOAD // LOAD R1, [20]
+{
+private:
+    int reg;
+    int address;
+public:
+    LOAD(int r, int addr)
+    {
+        reg = r;
+        address = addr;
+    }
+
+    void execute(CPU& cpu)override
+    {
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.setReg(reg, cpu.readMemory(address));
+    }
+};
+
+class STORE : public Instruction  // Direct STORE
+{
+private:
+    int reg;
+    int address;
+
+public:
+    STORE(int r, int addr)
+    {
+        reg = r;
+        address = addr;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.writeMemory(address, cpu.getReg(reg));
+    }
+};
+
+class LOAD_INDIRECT : public Instruction  // Indirect load  // LOAD R1, [R2]
+{
+private:
+    int destReg;
+    int addrReg;
+
+public:
+    LOAD_INDIRECT(int d, int a)
+    {
+        destReg = d;
+        addrReg = a;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int address = cpu.getReg(addrReg);
+
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.setReg(destReg, cpu.readMemory(address));
+    }
+};
+
+class STORE_INDIRECT : public Instruction  // Indirect store
+{
+private:
+    int addrReg;
+    int sourceReg;
+
+public:
+    STORE_INDIRECT(int a, int s)
+    {
+        addrReg = a;
+        sourceReg = s;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int address = cpu.getReg(addrReg);
+
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.writeMemory(address, cpu.getReg(sourceReg));
+    }
+};
+
+
 
 // 3.11: Flag Reset Instruction
-//Written by :Tan Khai Yu
+// Written by: Tan Khai Yu
+// Resets a specific flag (C, Z, U, or O) to false
 class RESET : public Instruction
 {
 private:
-    char FlagType;
+    char FlagType;  // Flag to reset: 'C', 'Z', 'U', or 'O'
+
 public:
-    RESET(char Type): FlagType(Type){}
+    RESET(char Type) : FlagType(Type) {}
+
     void execute(CPU& cpu) override
     {
         FlagRegister* flags = cpu.getFlags();
         switch (FlagType)
         {
-        case 'C':
-        {
-            flags->setCF(false);
+        case 'C': flags->setCF(false); break;
+        case 'Z': flags->setZF(false); break;
+        case 'U': flags->setUF(false); break;
+        case 'O': flags->setOF(false); break;
+        default: break;
         }
-            break;
-        case 'Z':
-        {
-            flags->setZF(false);
-        }
-            break;
-        case 'U':
-        {
-            flags->setUF(false);
-        }
-            break;
-        case 'O':
-        {
-            flags->setOF(false);
-        }
-            break;
-        default:
-        break;
-        }
-    }
-};
-// 3.12: Stack Operations
-//Written by:Tan Khai Yu
-class PUSH: public Instruction{
-    private:
-     int Source_Reg;
-    public:
-    PUSH(int Reg):Source_Reg(Reg){}
-    void execute(CPU& cpu){
-        signed char value = cpu.getReg(Source_Reg);
-        cpu.pushStack(value);
-    }
-};
-class POP : public Instruction{
-    private:
-     int Destination_Reg;
-    public:
-    POP(int Reg):Destination_Reg(Reg){}
-    void execute(CPU& cpu){
-        signed char value = cpu.popStack();
-         cpu.setReg(Destination_Reg, value);
     }
 };
 
+// 3.12: Stack Operations
+// Written by: Tan Khai Yu
+// PUSH: Stores a register's value onto the stack
+class PUSH : public Instruction
+{
+private:
+    int Source_Reg;  // Register to push (0-7)
+
+public:
+    PUSH(int Reg) : Source_Reg(Reg) {}
+
+    void execute(CPU& cpu)
+    {
+        signed char value = cpu.getReg(Source_Reg);
+        cpu.pushStack(value);  // Push value onto stack
+    }
+};
+
+// POP: Removes top stack value and stores it into a register
+class POP : public Instruction
+{
+private:
+    int Destination_Reg;  // Register to receive popped value (0-7)
+
+public:
+    POP(int Reg) : Destination_Reg(Reg) {}
+
+    void execute(CPU& cpu)
+    {
+        signed char value = cpu.popStack();  // Pop from stack
+        cpu.setReg(Destination_Reg, value);  // Store in register
+    }
+};
 //*****************************************************************
 //                       SECTION 4: Runner
 //*****************************************************************
 
-
+    /***
+    Below is just for bug testing!!!
+    These are NOT actual code.
+    Feel free to make changes for debugging purpose.
+    ***/
 int main()
 {
+    std::cout << "========================================" << std::endl;
+    std::cout << " RUNNING VIRTUAL MACHINE TEST SUITE     " << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    CPU myCpu;
+
+    //---------------------------------------------------------
+    // TEST 1: Register Boundary & Explicit IO Flag Manipulations
+    //---------------------------------------------------------
+    {
+        std::cout << "\n[TEST 1] Testing IO boundaries & Flags..." << std::endl;
+
+        Instruction* inputNormal = new Input(0);
+        std::cout << "-> Enter '55' to test normal assignment:" << std::endl;
+        inputNormal->execute(myCpu);
+
+        Instruction* displayR0 = new Display(0);
+        std::cout << "Value inside R0 is: ";
+        displayR0->execute(myCpu);
+        std::cout << std::endl;
+
+        Instruction* inputOverflow = new Input(1);
+        std::cout << "-> Enter '200' to test Overflow Flag trigger:" << std::endl;
+        inputOverflow->execute(myCpu);
+
+        std::cout << "Overflow Flag (OF) state (Expected 1): " << myCpu.getFlags()->getOF() << std::endl;
+
+        delete inputNormal;
+        delete displayR0;
+        delete inputOverflow;
+    }
+
+    //---------------------------------------------------------
+    // TEST 2: Reset Flag Instruction
+    //---------------------------------------------------------
+    {
+        std::cout << "\n[TEST 2] Testing RESET instruction..." << std::endl;
+
+        Instruction* resetOF = new RESET('O');
+        resetOF->execute(myCpu);
+        std::cout << "Overflow Flag (OF) state after RESET (Expected 0): " << myCpu.getFlags()->getOF() << std::endl;
+
+        delete resetOF;
+    }
+
+    //---------------------------------------------------------
+    // TEST 3: Stack Operations (PUSH & POP)
+    //---------------------------------------------------------
+    {
+        std::cout << "\n[TEST 3] Testing Stack Operations..." << std::endl;
+
+        myCpu.setReg(2, 42);
+        myCpu.setReg(3, 0);
+
+        Instruction* pushR2 = new PUSH(2);
+        Instruction* popR3 = new POP(3);
+
+        pushR2->execute(myCpu);
+        popR3->execute(myCpu);
+
+        std::cout << "Value transferred to R3 via Stack (Expected 42): " << (int)myCpu.getReg(3) << std::endl;
+
+        delete pushR2;
+        delete popR3;
+    }
+
+    //---------------------------------------------------------
+    // TEST 4: Multiple PUSH/POP Operations (LIFO Order)
+    //---------------------------------------------------------
+    {
+        std::cout << "\n[TEST 4] Testing Multiple PUSH/POP (LIFO Order)..." << std::endl;
+
+        for(int i = 0; i < 8; i++) {
+            myCpu.setReg(i, 0);
+        }
+
+        myCpu.setReg(0, 10);
+        myCpu.setReg(1, 20);
+        myCpu.setReg(2, 30);
+        myCpu.setReg(3, 40);
+
+        std::cout << "Initial values: R0=10, R1=20, R2=30, R3=40" << std::endl;
+
+        Instruction* pushR0 = new PUSH(0);
+        Instruction* pushR1 = new PUSH(1);
+        Instruction* pushR2 = new PUSH(2);
+        Instruction* pushR3 = new PUSH(3);
+
+        pushR0->execute(myCpu);
+        pushR1->execute(myCpu);
+        pushR2->execute(myCpu);
+        pushR3->execute(myCpu);
+
+        std::cout << "Pushed: R0, R1, R2, R3 onto stack" << std::endl;
+
+        Instruction* popR4 = new POP(4);
+        Instruction* popR5 = new POP(5);
+        Instruction* popR6 = new POP(6);
+        Instruction* popR7 = new POP(7);
+
+        popR4->execute(myCpu);
+        popR5->execute(myCpu);
+        popR6->execute(myCpu);
+        popR7->execute(myCpu);
+
+        std::cout << "Popped into R4,R5,R6,R7 (Expected LIFO: 40,30,20,10)" << std::endl;
+        std::cout << "Result: R4=" << (int)myCpu.getReg(4)
+                  << " R5=" << (int)myCpu.getReg(5)
+                  << " R6=" << (int)myCpu.getReg(6)
+                  << " R7=" << (int)myCpu.getReg(7) << std::endl;
+
+        bool lifoCorrect = ((int)myCpu.getReg(4) == 40 &&
+                            (int)myCpu.getReg(5) == 30 &&
+                            (int)myCpu.getReg(6) == 20 &&
+                            (int)myCpu.getReg(7) == 10);
+
+        if(lifoCorrect) {
+            std::cout << " LIFO order test PASSED!" << std::endl;
+        } else {
+            std::cout << " LIFO order test FAILED!" << std::endl;
+        }
+
+        delete pushR0;
+        delete pushR1;
+        delete pushR2;
+        delete pushR3;
+        delete popR4;
+        delete popR5;
+        delete popR6;
+        delete popR7;
+    }
+
+    //---------------------------------------------------------
+    // TEST 5: Reset ALL Flags (C, Z, U, O)
+    //---------------------------------------------------------
+    {
+        std::cout << "\n[TEST 5] Testing RESET on all flag types..." << std::endl;
+
+        FlagRegister* flags = myCpu.getFlags();
+
+        flags->setCF(true);
+        flags->setZF(true);
+        flags->setUF(true);
+        flags->setOF(true);
+
+        std::cout << "Before RESET - CF:" << flags->getCF()
+                  << " ZF:" << flags->getZF()
+                  << " UF:" << flags->getUF()
+                  << " OF:" << flags->getOF() << " (Expected: 1 1 1 1)" << std::endl;
+
+        Instruction* resetCF = new RESET('C');
+        Instruction* resetZF = new RESET('Z');
+        Instruction* resetUF = new RESET('U');
+        Instruction* resetOF2 = new RESET('O');
+
+        resetCF->execute(myCpu);
+        std::cout << "After RESET 'C' - CF:" << flags->getCF() << " (Expected: 0)" << std::endl;
+
+        resetZF->execute(myCpu);
+        std::cout << "After RESET 'Z' - ZF:" << flags->getZF() << " (Expected: 0)" << std::endl;
+
+        resetUF->execute(myCpu);
+        std::cout << "After RESET 'U' - UF:" << flags->getUF() << " (Expected: 0)" << std::endl;
+
+        resetOF2->execute(myCpu);
+        std::cout << "After RESET 'O' - OF:" << flags->getOF() << " (Expected: 0)" << std::endl;
+
+        if(!flags->getCF() && !flags->getZF() && !flags->getUF() && !flags->getOF()) {
+            std::cout << " All flags reset successfully!" << std::endl;
+        } else {
+            std::cout << " Flag reset test FAILED!" << std::endl;
+        }
+
+        delete resetCF;
+        delete resetZF;
+        delete resetUF;
+        delete resetOF2;
+    }
+
+    std::cout << "\n========================================" << std::endl;
+    std::cout << " TEST SUITE COMPLETE                     " << std::endl;
+    std::cout << "========================================" << std::endl;
+
     return 0;
 }
