@@ -405,6 +405,54 @@ public:
     }
 };
 // 3.4: MOV Operations
+class MovOperation:public Instruction
+{
+private:
+int mov_mode; //MOV mode(1.R1,10 / 2.R1,R0 / 3.R1,[R2])
+int destination; //destination of register
+int source; // which register to MOV to the destination
+signed char number; //number (-128 to 127) to MOV to destination
+
+public:
+    MovOperation(int dest, signed char num)
+    {
+        mov_mode=0;
+        destination=dest;
+        number=num;
+    }
+    MovOperation(int dest, int src) //same with mode 2
+    {
+        mov_mode=1;
+        destination=dest;
+        source=src;
+        }
+    MovOperation(int dest, int src, int nums) //same with mode 1 but have int num is just to differentiate mode 1 and 2
+    {
+        mov_mode=2;
+        destination=dest;
+        source=src;
+    }
+    void execute(CPU& cpu)
+    {
+        switch(mov_mode)
+        {
+        case 0:
+            cpu.register[destination].setValue(number);//still need to modify
+        break;
+        case 1:
+            cpu.register[destination].setValue(source);//still need to modify
+        break;
+        case 2:
+            cpu.register[destination].setValue(memory.read(address));//still need to modify
+        break;
+        default:
+            cout<<"You cant MOVE this!!!"<<endl;
+            return;//still need to use class Flag
+        }
+    };
+
+};
+
 // 3.5: Arithmetic Operations
 // 3.6: Increment and Decrement Operations
 // Written by: Chen Chee Chuen
@@ -500,6 +548,46 @@ public:
 // 3.7: ROL Operations
 // 3.8: ROR Operations
 // 3.9: Shift Operations
+class SftOperation:public Instruction
+{
+    private:
+        int sft_mode;
+        int sft_num;
+        int destination;
+    public:
+        SftOperation(int dest,int Count,int mode)
+        {
+            sft_mode=mode;
+            destination=dest;
+            sft_num=Count;
+    }
+    void execute(CPU& cpu)
+    {
+        switch(sft_mode)
+        {
+            case 0: //case 0 is SHL
+            for(int i=0; i<sft_num;i++)
+            {
+                signed char val=cpu.registers[destination].getValue();
+                val *=2;
+                cpu.write[destination].setValue(val);
+            }
+            break;
+
+            case 1: //case 0 is SHR
+            for(int i=0; i<sft_num;i++)
+            {
+                signed char val=cpu.registers[destination].getValue();
+                val /=2;
+                cpu.write[destination].setValue(val);
+            }
+            break;
+        }
+    }
+};
+
+
+
 // 3.10: Load and Store Operations
 // Written by: Chen Chee Chuen
 class LOAD : public Instruction  //Direct LOAD // LOAD R1, [20]
