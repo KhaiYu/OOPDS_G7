@@ -294,7 +294,18 @@ private:
 
 public:
     CPU() : stack_index() {}
+
     ~CPU() {delete ptr_flag;}
+
+    signed char readMemory(int address)
+    {
+        return cpu_memory.read(address);
+    }
+
+    void writeMemory(int address, signed char value)
+    {
+        cpu_memory.write(address, value);
+    }
 
     FlagRegister* getFlags()
     {
@@ -396,10 +407,205 @@ public:
 // 3.4: MOV Operations
 // 3.5: Arithmetic Operations
 // 3.6: Increment and Decrement Operations
+// Written by: Chen Chee Chuen
+class INC : public Instruction
+{
+private:
+    int reg;
+
+public:
+    INC(int r)
+    {
+        reg = r;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int result = cpu.getReg(reg) + 1;
+
+        // Reset Flags
+        cpu.getFlags()->setOF(false);
+        cpu.getFlags()->setUF(false);
+        cpu.getFlags()->setZF(false);
+        cpu.getFlags()->setCF(false);
+
+        // Overflow
+        if(result > 127)
+        {
+            cpu.getFlags()->setOF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        // Underflow
+        if(result < -128)
+        {
+            cpu.getFlags()->setUF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        if((signed char)result == 0)
+        {
+            cpu.getFlags()->setZF(true);
+        }
+
+        cpu.setReg(reg, (signed char)result);
+    }
+};
+
+class DEC : public Instruction
+{
+private:
+    int reg;
+
+public:
+    DEC(int r)
+    {
+        reg = r;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int result = cpu.getReg(reg) - 1;
+
+        // Reset Flags
+        cpu.getFlags()->setOF(false);
+        cpu.getFlags()->setUF(false);
+        cpu.getFlags()->setZF(false);
+        cpu.getFlags()->setCF(false);
+
+        // Overflow
+        if(result > 127)
+        {
+            cpu.getFlags()->setOF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        // Underflow
+        if(result < -128)
+        {
+            cpu.getFlags()->setUF(true);
+            cpu.getFlags()->setCF(true);
+        }
+
+        // Zero Flag
+        if((signed char)result == 0)
+        {
+            cpu.getFlags()->setZF(true);
+        }
+
+        cpu.setReg(reg, (signed char)result);
+    }
+};
+
 // 3.7: ROL Operations
 // 3.8: ROR Operations
 // 3.9: Shift Operations
 // 3.10: Load and Store Operations
+// Written by: Chen Chee Chuen
+class LOAD : public Instruction  //Direct LOAD // LOAD R1, [20]
+{
+private:
+    int reg;
+    int address;
+public:
+    LOAD(int r, int addr)
+    {
+        reg = r;
+        address = addr;
+    }
+
+    void execute(CPU& cpu)override
+    {
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.setReg(reg, cpu.readMemory(address));
+    }
+};
+
+class STORE : public Instruction  // Direct STORE
+{
+private:
+    int reg;
+    int address;
+
+public:
+    STORE(int r, int addr)
+    {
+        reg = r;
+        address = addr;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.writeMemory(address, cpu.getReg(reg));
+    }
+};
+
+class LOAD_INDIRECT : public Instruction  // Indirect load  // LOAD R1, [R2]
+{
+private:
+    int destReg;
+    int addrReg;
+
+public:
+    LOAD_INDIRECT(int d, int a)
+    {
+        destReg = d;
+        addrReg = a;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int address = cpu.getReg(addrReg);
+
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.setReg(destReg, cpu.readMemory(address));
+    }
+};
+
+class STORE_INDIRECT : public Instruction  // Indirect store
+{
+private:
+    int addrReg;
+    int sourceReg;
+
+public:
+    STORE_INDIRECT(int a, int s)
+    {
+        addrReg = a;
+        sourceReg = s;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        int address = cpu.getReg(addrReg);
+
+        if(address < 0 || address >= 64)
+        {
+            std::cout << "Memory Error" << std::endl;
+            return;
+        }
+
+        cpu.writeMemory(address, cpu.getReg(sourceReg));
+    }
+};
+
+
 
 // 3.11: Flag Reset Instruction
 //Written by :Tan Khai Yu
