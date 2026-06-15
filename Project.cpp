@@ -301,7 +301,7 @@ public:
         return ptr_flag;
     }
 
-    signed char const getReg(int idx) {
+    signed char getReg(int idx) const {
         if (idx >= 0 && idx < 8)
             return r[idx].getValue();
         return 0;
@@ -324,7 +324,6 @@ public:
         stack_index.pop();
         return stack.pop();
     }
-
 };
 // Forward declaration;
 //*****************************************************************
@@ -394,10 +393,220 @@ public:
     }
 };
 // 3.4: MOV Operations
+
 // 3.5: Arithmetic Operations
+// Written by: Wong Haw Jack
+class Arithmetic: public Instruction
+{
+private:
+    int source_reg;
+    int destination_reg;
+
+public:
+    Arithmetic(int d, int s): source_reg(s), destination_reg(d){}
+
+    int get_source_reg() const {return source_reg;}
+    int get_destination_reg() const {return destination_reg;}
+};
+
+class ADD: public Arithmetic
+{
+public:
+    ADD(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(source_value) + int(dest_value);
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result = u_dest_value + u_source_value;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
+
+class SUB: public Arithmetic
+{
+public:
+    SUB(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(dest_value) - int(source_value);
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result = u_dest_value - u_source_value;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
+
+class MUL: public Arithmetic
+{
+public:
+    MUL(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(dest_value) * int(source_value);
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result = u_dest_value * u_source_value;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
+
+class DIV: public Arithmetic
+{
+public:
+    DIV(int d, int s): Arithmetic(d, s){}
+
+    void execute(CPU& cpu)
+    {
+        int source_index = get_source_reg();
+        int dest_index = get_destination_reg();
+
+        signed char source_value = cpu.getReg(source_index);
+        signed char dest_value = cpu.getReg(dest_index);
+
+        int signed_result = int(dest_value) / int(source_value) ;
+
+        unsigned char u_source_value = (unsigned char)source_value;
+        unsigned char u_dest_value = (unsigned char)dest_value;
+
+        unsigned char unsigned_result =  u_dest_value / u_source_value ;
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(signed_result < -128);
+        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setZF(signed_result == 0);
+
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+    }
+};
 // 3.6: Increment and Decrement Operations
 // 3.7: ROL Operations
 // 3.8: ROR Operations
+// Written by Jack Wong
+class Rotate : public Instruction
+{
+private:
+    int destination_reg;
+    int count;
+
+public:
+    Rotate(int d, int c)
+    {
+        destination_reg = d;
+        count = c;
+    }
+
+    int get_dest_reg() const {return destination_reg;}
+    int get_count() const {return count;}
+};
+
+class ROL : public Rotate
+{
+public:
+    ROL(int d, int c) : Rotate(d, c){}
+
+    void execute(CPU& cpu)
+    {
+        int destination_index = get_dest_reg();
+        int count = get_count();
+
+        count %= 8;
+
+        signed char signed_before_ro = cpu.getReg(destination_index);
+        unsigned char unsigned_before_ro = static_cast<unsigned char>(signed_before_ro);
+
+        unsigned char unsigned_after_ro = 0;
+        if (count == 0)
+        {
+            unsigned_after_ro = unsigned_before_ro;
+        }
+        else
+        {
+            unsigned_after_ro = (unsigned_before_ro << count) | (unsigned_before_ro >> (8 - count));
+        }
+        signed char signed_after_ro = static_cast<signed char>(unsigned_after_ro);
+
+        cpu.setReg(destination_index, signed_after_ro);
+
+        cpu.getFlags()->setZF(signed_after_ro == 0);
+    }
+};
+class ROR : public Rotate
+{
+public:
+    ROR(int d, int c) : Rotate(d, c){}
+
+    void execute(CPU& cpu)
+    {
+        int destination_index = get_dest_reg();
+        int count = get_count();
+
+        count %= 8;
+
+        signed char signed_before_ro = cpu.getReg(destination_index);
+        unsigned char unsigned_before_ro = static_cast<unsigned char>(signed_before_ro);
+
+        unsigned char unsigned_after_ro = 0;
+        if (count == 0)
+        {
+            unsigned_after_ro = unsigned_before_ro;
+        }
+        else
+        {
+            unsigned_after_ro = (unsigned_before_ro >> count) | (unsigned_before_ro << (8 - count));
+        }
+        signed char signed_after_ro = static_cast<signed char>(unsigned_after_ro);
+
+        cpu.setReg(destination_index, signed_after_ro);
+
+        cpu.getFlags()->setZF(signed_after_ro == 0);
+    }
+};
 // 3.9: Shift Operations
 // 3.10: Load and Store Operations
 
@@ -469,80 +678,5 @@ class POP : public Instruction{
 
 int main()
 {
-    /***
-    Below is just for bug testing!!!
-    These are NOT actual code.
-    Feel free to make changes for debugging purpose.
-    ***/
-    std::cout << "========================================" << std::endl;
-    std::cout << " RUNNING VIRTUAL MACHINE TEST SUITE     " << std::endl;
-    std::cout << "========================================" << std::endl;
-
-    CPU myCpu;
-
-    //---------------------------------------------------------
-    // TEST 1: Register Boundary & Explicit IO Flag Manipulations
-    //---------------------------------------------------------
-    std::cout << "\n[TEST 1] Testing IO boundaries & Flags..." << std::endl;
-
-    // Test Input Instruction (Normal range)
-    // Run this manually: Type '55' when prompted
-    Instruction* inputNormal = new Input(0); // Targets R0
-    std::cout << "-> Enter '55' to test normal assignment:" << std::endl;
-    inputNormal->execute(myCpu);
-
-    Instruction* displayR0 = new Display(0);
-    std::cout << "Value inside R0 is: ";
-    displayR0->execute(myCpu);
-    std::cout << std::endl;
-
-    // Test Input Instruction (Overflow boundary trigger)
-    // Run this manually: Type '200' when prompted (Exceeds signed char 127)
-    Instruction* inputOverflow = new Input(1); // Targets R1
-    std::cout << "-> Enter '200' to test Overflow Flag trigger:" << std::endl;
-    inputOverflow->execute(myCpu);
-
-    std::cout << "Overflow Flag (OF) state (Expected 1): " << myCpu.getFlags()->getOF() << std::endl;
-
-    //---------------------------------------------------------
-    // TEST 2: Reset Flag Instruction
-    //---------------------------------------------------------
-    std::cout << "\n[TEST 2] Testing RESET instruction..." << std::endl;
-
-    Instruction* resetOF = new RESET('O');
-    resetOF->execute(myCpu);
-    std::cout << "Overflow Flag (OF) state after RESET (Expected 0): " << myCpu.getFlags()->getOF() << std::endl;
-
-    //---------------------------------------------------------
-    // TEST 3: Stack Operations (PUSH & POP)
-    //---------------------------------------------------------
-    std::cout << "\n[TEST 3] Testing Stack Operations..." << std::endl;
-
-    // Prepare values via direct set methods to bypass std::cin during structural tests
-    myCpu.setReg(2, 42);  // Place 42 into R2
-    myCpu.setReg(3, 0);   // Clear R3
-
-    Instruction* pushR2 = new PUSH(2); // Push R2 (42) onto stack
-    Instruction* popR3 = new POP(3);   // Pop top stack value into R3
-
-    pushR2->execute(myCpu);
-    popR3->execute(myCpu);
-
-    std::cout << "Value transferred to R3 via Stack (Expected 42): " << (int)myCpu.getReg(3) << std::endl;
-
-    //---------------------------------------------------------
-    // CLEANUP
-    //---------------------------------------------------------
-    delete inputNormal;
-    delete displayR0;
-    delete inputOverflow;
-    delete resetOF;
-    delete pushR2;
-    delete popR3;
-
-    std::cout << "\n========================================" << std::endl;
-    std::cout << " TEST SUITE COMPLETE                     " << std::endl;
-    std::cout << "========================================" << std::endl;
-
     return 0;
 }
