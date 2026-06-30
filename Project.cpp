@@ -414,68 +414,16 @@ public:
 // 3.13： Parser Class
 //Writen by : Tan Yi Da
 
-#include <iostream>
-#include <string>
 class Parser {
 private:
-    std::string line;
-    std::string ins;
+    string line;
+    string ins;
 
-    std::string trim(const std::string& str) {
+    string trim(const string& str) {
         size_t first = str.find_first_not_of(" \t\r\n");
-        if (first == std::string::npos) return "";
+        if (first == string::npos) return "";
         size_t last = str.find_last_not_of(" \t\r\n");
         return str.substr(first, (last - first + 1));
-    }
-
-    Instruction* parseMov(int dest, const std::string& src) {
-        if (src[0] == 'R') {
-            return new MovOperation(dest, src[1] - '0');
-        }
-        if (src[0] == '[') {
-            if (src[1] == 'R' && src[src.length() - 1] == ']') {
-                return new MovOperation(dest, src[2] - '0', 0);
-            }
-        }
-        return new MovOperation(dest, (signed char)std::stoi(src));
-    }
-
-    Instruction* parseLoad(int dest, const std::string& src) {
-        if (src[0] == '[') {
-            if (src[1] == 'R') {
-                return new LOAD_INDIRECT(dest, src[2] - '0');
-            }
-            std::string addrStr = src.substr(1, src.length() - 2);
-            return new LOAD(dest, std::stoi(addrStr));
-        }
-        return nullptr;
-    }
-
-    Instruction* parseStore(const std::string& first, const std::string& second) {
-        int srcReg = second[1] - '0';
-        if (first[0] == '[') {
-            if (first[1] == 'R') {
-                return new STORE_INDIRECT(first[2] - '0', srcReg);
-            }
-            std::string addrStr = first.substr(1, first.length() - 2);
-            return new STORE(srcReg, std::stoi(addrStr));
-        }
-        return nullptr;
-    }
-
-    Instruction* executeParse(const std::string& opcode, const std::string& first, const std::string& second) {
-        if (opcode == "MOV") return parseMov(first[1] - '0', second);
-        if (opcode == "ADD") return new ADD(first[1] - '0', second[1] - '0');
-        if (opcode == "SUB") return new SUB(first[1] - '0', second[1] - '0');
-        if (opcode == "MUL") return new MUL(first[1] - '0', second[1] - '0');
-        if (opcode == "DIV") return new DIV(first[1] - '0', second[1] - '0');
-        if (opcode == "ROL") return new ROL(first[1] - '0', std::stoi(second));
-        if (opcode == "ROR") return new ROR(first[1] - '0', std::stoi(second));
-        if (opcode == "SHL") return new SftOperation(first[1] - '0', std::stoi(second), 0);
-        if (opcode == "SHR") return new SftOperation(first[1] - '0', std::stoi(second), 1);
-        if (opcode == "LOAD") return parseLoad(first[1] - '0', second);
-        if (opcode == "STORE") return parseStore(first, second);
-        return nullptr;
     }
 
 public:
@@ -483,24 +431,68 @@ public:
         line = " ";
         ins = " ";
     }
-    Instruction* parseLine(const std::string& inputLine) {
-        size_t spacePos = inputLine.find_first_of(" \t");
-        if (spacePos == std::string::npos) return nullptr;
-        std::string opcode = inputLine.substr(0, spacePos);
-        std::string args = trim(inputLine.substr(spacePos + 1));
-        if (args.find(' ') != std::string::npos) {
-            std::cout << "Error: Spaces are not allowed in arguments!" << std::endl;
-            return nullptr;
-        }
-        size_t commaPos = args.find(',');
-        if (commaPos == std::string::npos) {
-            std::cout << "Error format of instruction. " << std::endl;
-            return nullptr;
-        }
-        std::string firstArg = trim(args.substr(0, commaPos));
-        std::string secondArg = trim(args.substr(commaPos + 1));
 
-        return executeParse(opcode, firstArg, secondArg);
+    Instruction* parseLine(const string& inputLine) {
+        size_t spacePos = inputLine.find_first_of(" \t");
+
+        if (spacePos == string::npos) {
+            string cmd = trim(inputLine);
+            if (cmd == "RESET") return new RESET();
+            return nullptr;
+        }
+
+        string opcode = inputLine.substr(0, spacePos);
+        string args = trim(inputLine.substr(spacePos + 1));
+
+        size_t commaPos = args.find(',');
+
+        if (commaPos == string::npos) {
+            if (opcode == "INPUT")   return new INPUT(args[1] - '0');
+            if (opcode == "POP")     return new POP(args[1] - '0');
+            if (opcode == "INC")     return new INC(args[1] - '0');
+            if (opcode == "DEC")     return new DEC(args[1] - '0');
+
+            if (opcode == "PUSH") {
+                if (args[0] == 'R') return new PUSH_REG(args[1] - '0');
+                return new PUSH_NUM((signed char)stoi(args));
+            }
+            if (opcode == "DISPLAY") {
+                if (args[0] == '[') return new DISPLAY_MEM(stoi(args.substr(1, args.length() - 2)));
+                return new DISPLAY_REG(args[1] - '0');
+            }
+            return nullptr;
+        }
+
+        string first = trim(args.substr(0, commaPos));
+        string second = trim(args.substr(commaPos + 1));
+
+        if (opcode == "ADD")   return new ADD(first[1] - '0', second[1] - '0');
+        if (opcode == "SUB")   return new SUB(first[1] - '0', second[1] - '0');
+        if (opcode == "MUL")   return new MUL(first[1] - '0', second[1] - '0');
+        if (opcode == "DIV")   return new DIV(first[1] - '0', second[1] - '0');
+        if (opcode == "ROL")   return new ROL(first[1] - '0', stoi(second));
+        if (opcode == "ROR")   return new ROR(first[1] - '0', stoi(second));
+        if (opcode == "SHL")   return new SftOperation(first[1] - '0', stoi(second), 0);
+        if (opcode == "SHR")   return new SftOperation(first[1] - '0', stoi(second), 1);
+
+        if (opcode == "MOV") {
+            if (second[0] == 'R') return new MovOperation(first[1] - '0', second[1] - '0');
+            if (second[0] == '[') return new MovOperation(first[1] - '0', second[2] - '0', 0);
+            return new MovOperation(first[1] - '0', (signed char)stoi(second));
+        }
+
+        if (opcode == "LOAD") {
+            if (second[1] == 'R') return new LOAD_INDIRECT(first[1] - '0', second[2] - '0');
+            return new LOAD(first[1] - '0', stoi(second.substr(1, second.length() - 2)));
+        }
+
+        if (opcode == "STORE") {
+            int srcReg = second[1] - '0';
+            if (first[1] == 'R') return new STORE_INDIRECT(first[2] - '0', srcReg);
+            return new STORE(srcReg, stoi(first.substr(1, first.length() - 2)));
+        }
+
+        return nullptr;
     }
 };
 
