@@ -34,7 +34,7 @@ void dumpStateToConsole(CPU& cpu,int pcValue){
     std::cout << "\n";
 
     FlagRegister* flags = cpu.getFlags();
-    std::cout << "#Flags#OF#" << flags -> getOF()
+    std::cout << "#FLAGS#OF#" << flags -> getOF()
               << "#UF#" << flags -> getUF()
               << "#CF#" << flags -> getCF()
               << "#ZF#" << flags -> getZF() << "#\n";
