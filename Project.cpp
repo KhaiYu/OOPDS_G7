@@ -22,7 +22,7 @@ This program strictly follow below program structure:
 
 #include <iostream>
 #include <string>
-
+using namespace std;
 //*****************************************************************
 //              SECTION 1: CUSTOM DATA STRUCTURES
 //*****************************************************************
@@ -284,52 +284,73 @@ public:
 // 3.2: Input Operations
 // 3.3: Output Operations
 // 3.4: MOV Operations
-class MovOperation:public Instruction
+// Written by: Tan Yi Da
+class MovOperation : public Instruction
 {
 private:
-int mov_mode; //MOV mode(1.R1,10 / 2.R1,R0 / 3.R1,[R2])
-int destination; //destination of register
-int source; // which register to MOV to the destination
-signed char number; //number (-128 to 127) to MOV to destination
+    int mov_mode; // MOV mode (0: R1,10 / 1: R1,R0 / 2: R1,[R2])
+    int destination;
+    int source;
+    signed char number;
 
 public:
+
     MovOperation(int dest, signed char num)
     {
-        mov_mode=0;
-        destination=dest;
-        number=num;
+        mov_mode = 0;
+        destination = dest;
+        number = num;
+        source = 0;
     }
-    MovOperation(int dest, int src) //same with mode 2
+
+    // Mode 1: MOV R1, R0 (Copies the value stored in the source register to the destination register)
+    MovOperation(int dest, int src)
     {
-        mov_mode=1;
-        destination=dest;
-        source=src;
-        }
-    MovOperation(int dest, int src, int nums) //same with mode 1 but have int num is just to differentiate mode 1 and 2
-    {
-        mov_mode=2;
-        destination=dest;
-        source=src;
+        mov_mode = 1;
+        destination = dest;
+        source = src;
+        number = 0;
     }
-    void execute(CPU& cpu)
+
+    // Mode 2: MOV R1, [R2] (Reads data from the memory address stored in the source register and copies it to the destination register)
+    // An extra dummy parameter (int mode) is added to differentiate the overload from the two-argument constructor
+    MovOperation(int dest, int src, int mode)
+    {
+        mov_mode = 2;
+        destination = dest;
+        source = src;
+        number = 0;
+    }
+
+    void execute(CPU& cpu) override
     {
         switch(mov_mode)
         {
-        case 0:
-            cpu.register[destination].setValue(number);//still need to modify
-        break;
-        case 1:
-            cpu.register[destination].setValue(source);//still need to modify
-        break;
-        case 2:
-            cpu.register[destination].setValue(memory.read(address));//still need to modify
-        break;
-        default:
-            cout<<"You cant MOVE this!!!"<<endl;
-            return;//still need to use class Flag
+            case 0:
+                cpu.setReg(destination, number);
+                break;
+            case 1:
+                cpu.setReg(destination, cpu.getReg(source));
+                break;
+            case 2:
+                {
+                    // Fetch the memory address value stored inside the source register
+                    int address = static_cast<int>(cpu.getReg(source));
+                    if (address >= 0 && address < 64)
+                    {
+                        cpu.setReg(destination, cpu.readMemory(address));
+                    }
+                    else
+                    {
+                        std::cerr << "Memory Access Error in MOV Instruction!" << std::endl;
+                    }
+                }
+                break;
+            default:
+                std::cout << "You can't MOVE this!!!" << std::endl;
+                return;
         }
-    };
-
+    }
 };
 
 // 3.5: Arithmetic Operations
@@ -337,41 +358,51 @@ public:
 // 3.7: ROL Operations
 // 3.8: ROR Operations
 // 3.9: Shift Operations
-class SftOperation:public Instruction
+// 3.9: Shift Operations
+// Written By: Tan Yi Da
+class SftOperation : public Instruction
 {
-    private:
-        int sft_mode;
-        int sft_num;
-        int destination;
-    public:
-        SftOperation(int dest,int Count,int mode)
-        {
-            sft_mode=mode;
-            destination=dest;
-            sft_num=Count;
-    }
-    void execute(CPU& cpu)
+private:
+    int sft_mode; // 0: SHL (Shift Left), 1: SHR (Shift Right)
+    int sft_num; // Number of shifts
+    int destination; // Destination register index
+
+public:
+    SftOperation(int dest, int Count, int mode)
     {
+        sft_mode = mode;
+        destination = dest;
+        sft_num = Count;
+    }
+
+    void execute(CPU& cpu) override
+    {
+        // Retrieve the original value of the register via the public interface
+        signed char val = cpu.getReg(destination);
+
         switch(sft_mode)
         {
-            case 0: //case 0 is SHL
-            for(int i=0; i<sft_num;i++)
-            {
-                signed char val=cpu.registers[destination].getValue();
-                val *=2;
-                cpu.write[destination].setValue(val);
-            }
-            break;
+            case 0: // SHL: Logical Shift Left
+                for(int i = 0; i < sft_num; i++)
+                {
+                    val = val << 1;
+                }
+                break;
 
-            case 1: //case 0 is SHR
-            for(int i=0; i<sft_num;i++)
-            {
-                signed char val=cpu.registers[destination].getValue();
-                val /=2;
-                cpu.write[destination].setValue(val);
-            }
-            break;
+            case 1: // SHR: Logical Shift Right
+                // Casting to unsigned char ensures that the higher bits are padded with 0s during right shift (logical shift)
+                unsigned char uVal = static_cast<unsigned char>(val);
+                for(int i = 0; i < sft_num; i++)
+                {
+                    uVal = uVal >> 1;
+                }
+                val = static_cast<signed char>(uVal);
+                break;
         }
+
+        // Store the shifted value back to the register and update the Zero Flag (ZF)
+        cpu.setReg(destination, val);
+        cpu.getFlags()->setZF(val == 0);
     }
 };
 
@@ -380,6 +411,98 @@ class SftOperation:public Instruction
 // 3.10: Load and Store Operations
 // 3.11: Flag Reset Instruction
 // 3.12: Stack Operations
+// 3.13： Parser Class
+//Writen by : Tan Yi Da
+
+#include <iostream>
+#include <string>
+class Parser {
+private:
+    std::string line;
+    std::string ins;
+
+    std::string trim(const std::string& str) {
+        size_t first = str.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) return "";
+        size_t last = str.find_last_not_of(" \t\r\n");
+        return str.substr(first, (last - first + 1));
+    }
+
+    Instruction* parseMov(int dest, const std::string& src) {
+        if (src[0] == 'R') {
+            return new MovOperation(dest, src[1] - '0');
+        }
+        if (src[0] == '[') {
+            if (src[1] == 'R' && src[src.length() - 1] == ']') {
+                return new MovOperation(dest, src[2] - '0', 0);
+            }
+        }
+        return new MovOperation(dest, (signed char)std::stoi(src));
+    }
+
+    Instruction* parseLoad(int dest, const std::string& src) {
+        if (src[0] == '[') {
+            if (src[1] == 'R') {
+                return new LOAD_INDIRECT(dest, src[2] - '0');
+            }
+            std::string addrStr = src.substr(1, src.length() - 2);
+            return new LOAD(dest, std::stoi(addrStr));
+        }
+        return nullptr;
+    }
+
+    Instruction* parseStore(const std::string& first, const std::string& second) {
+        int srcReg = second[1] - '0';
+        if (first[0] == '[') {
+            if (first[1] == 'R') {
+                return new STORE_INDIRECT(first[2] - '0', srcReg);
+            }
+            std::string addrStr = first.substr(1, first.length() - 2);
+            return new STORE(srcReg, std::stoi(addrStr));
+        }
+        return nullptr;
+    }
+
+    Instruction* executeParse(const std::string& opcode, const std::string& first, const std::string& second) {
+        if (opcode == "MOV") return parseMov(first[1] - '0', second);
+        if (opcode == "ADD") return new ADD(first[1] - '0', second[1] - '0');
+        if (opcode == "SUB") return new SUB(first[1] - '0', second[1] - '0');
+        if (opcode == "MUL") return new MUL(first[1] - '0', second[1] - '0');
+        if (opcode == "DIV") return new DIV(first[1] - '0', second[1] - '0');
+        if (opcode == "ROL") return new ROL(first[1] - '0', std::stoi(second));
+        if (opcode == "ROR") return new ROR(first[1] - '0', std::stoi(second));
+        if (opcode == "SHL") return new SftOperation(first[1] - '0', std::stoi(second), 0);
+        if (opcode == "SHR") return new SftOperation(first[1] - '0', std::stoi(second), 1);
+        if (opcode == "LOAD") return parseLoad(first[1] - '0', second);
+        if (opcode == "STORE") return parseStore(first, second);
+        return nullptr;
+    }
+
+public:
+    Parser() {
+        line = " ";
+        ins = " ";
+    }
+    Instruction* parseLine(const std::string& inputLine) {
+        size_t spacePos = inputLine.find_first_of(" \t");
+        if (spacePos == std::string::npos) return nullptr;
+        std::string opcode = inputLine.substr(0, spacePos);
+        std::string args = trim(inputLine.substr(spacePos + 1));
+        if (args.find(' ') != std::string::npos) {
+            std::cout << "Error: Spaces are not allowed in arguments!" << std::endl;
+            return nullptr;
+        }
+        size_t commaPos = args.find(',');
+        if (commaPos == std::string::npos) {
+            std::cout << "Error format of instruction. " << std::endl;
+            return nullptr;
+        }
+        std::string firstArg = trim(args.substr(0, commaPos));
+        std::string secondArg = trim(args.substr(commaPos + 1));
+
+        return executeParse(opcode, firstArg, secondArg);
+    }
+};
 
 //*****************************************************************
 //                         SECTION 4: CPU
