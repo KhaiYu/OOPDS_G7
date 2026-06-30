@@ -21,6 +21,7 @@ This program strictly follow below program structure:
 
 #include <iostream>
 #include <string>
+#include <fstream> 
 
 //*****************************************************************
 //              SECTION 1: CUSTOM DATA STRUCTURES
@@ -148,10 +149,102 @@ public:
     int get_top_index() {return topIndex;}
 };
 // 1.3: SYSTEM QUEUE
-// Written By:
+// Written By: Chen Chee Chuen
+//Custom generic Queue using dynamic array. Implements FIFO (First In First Out) operations.
 
-class MyQueue{};
+template <class T>
+class MyQueue
+{
+private:
+    T* data;  // pointer to the dynamic array (storing queue elements)
+    int frontIndex;  // index of first element
+    int rearIndex; // index of last element
+    int capacity; // current array capacity / maximum number of elements the array can store
+    void resize()
+        {
+            int newCapacity;  // store the new array size 
 
+            if (capacity == 0)
+                newCapacity = 1;   // first allocation, create array of size 1 
+            else
+                newCapacity = capacity * 2;   // double the current capacity (e.g: 4 to 8)
+
+            T* temp = new T[newCapacity];  // Create a new array with a larger capacity to store more elements
+
+            int j = 0;  // Index for the new array
+
+            for (int i = frontIndex; i <= rearIndex; i++)   // Copy all queue elements
+            {
+                temp[j] = data[i];  // copy one element 
+                j++;   // move to the next position
+            }
+
+            delete[] data;   //delete the old array to free the old meomory
+
+            data = temp; // data now points to the new array 
+
+            frontIndex = 0;  // reset front to index 0
+
+            rearIndex = j - 1;  // rear becomes the last copied element 
+
+            capacity = newCapacity;  //update the new capacity
+        }
+
+public:
+    MyQueue()  //constructor
+    {
+        data = nullptr;   //no memory allocated yet 
+        frontIndex = 0;  //front start at index 0
+        rearIndex = -1;  //no element exists (queue is empty)
+        capacity = 0;  //no storage yet
+    }
+
+    ~MyQueue()  //destructor
+    {
+        delete[] data;  //release dynamic memory - we must free it, otherwise memory Leak.
+    }
+
+    bool empty()
+    {
+        return frontIndex > rearIndex;  //true if no element remain
+    }
+
+    int size()
+    {
+        return rearIndex - frontIndex + 1;  //calculate number of elements 
+    }
+
+    void enqueue (T value)
+    {
+        if (rearIndex + 1 >= capacity)  //check whether there is enough space - is the array full?
+            resize();  //if yes, create a bigger array 
+
+        rearIndex++;  //move rear to the next position
+
+        data[rearIndex] = value;  //store the new element
+    }
+
+    T dequeue()
+    {
+        if (empty())
+        {
+            std::cout << "Queue is empty!" << std::endl;  //display error message 
+            exit(1);  //stop the program
+        }
+        return data[frontIndex++];  //return the front element, then move frontIndex forward(Take the first item and remove it from the queue)
+    }
+
+    T front()
+    {
+        if (empty())  // check if queue is empty 
+        {
+            std::cout << "Queue is empty!" << std::endl;  //display error message 
+            exit(1);  // stop the program
+        }
+
+        return data[frontIndex];  //return front element without removing it (Look at the first item only (don't remove it))
+    }
+};
 
 //*****************************************************************
 //             SECTION 2: VIRTUAL MACHINE ARCHITECTURE
@@ -967,6 +1060,39 @@ public:
         cpu.setReg(Destination_Reg, value);  // Store in register
     }
 };
+
+// 3.13: File Reader 
+// Written by: Chen Chee Chuen
+// Reads an assembly(.asm) file line by line and storeseach instruction into the custom queue
+class FileReader
+{
+public:
+    void readFile(const std::string& filename, MyQueue<std::string>& instructionQueue)  //function: read file + store lines into queue
+    {
+        std::ifstream fin(filename);  //open file for reading (input file stream)
+
+        if(!fin) //check if file failed to open
+        {
+            std::cout << "Error: Cannot open file" << std::endl;  //print error message
+            return;  //stop function if file cannot be opened
+        }
+
+        std::string line;  //temporary variable to store each line from file 
+
+        while(getline(fin, line))  //read file line by line until EOF
+        {
+            if (line.empty())  //check if line is empty
+            {
+                continue;  //skip empty lines
+            }
+
+            instructionQueue.enqueue(line);  //store instruction into queue (FIFO order)
+        }
+
+        fin.close(); //close the file after reading and free the file resources
+    }
+};
+
 //*****************************************************************
 //                       SECTION 4: Runner
 //*****************************************************************
