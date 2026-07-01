@@ -594,7 +594,7 @@ private:
     int destination_reg;
 
 public:
-    Arithmetic(int d, int s): source_reg(s), destination_reg(d){}
+    Arithmetic(int d, int s): destination_reg(d), source_reg(s){}
 
     int get_source_reg() const {return source_reg;}
     int get_destination_reg() const {return destination_reg;}
@@ -607,26 +607,26 @@ public:
 
     void execute(CPU& cpu)
     {
+        int dest_index = get_destination_reg(); //Get the index of the register.
         int source_index = get_source_reg();
-        int dest_index = get_destination_reg();
 
-        signed char source_value = cpu.getReg(source_index);
+        signed char source_value = cpu.getReg(source_index); //Get the value through cpu member function
         signed char dest_value = cpu.getReg(dest_index);
 
-        signed char signed_result = static_cast<signed char>(source_value + dest_value);
-        // Cast operands to unsigned values first, then store their sum inside a wider 32-bit int
+        signed char signed_result = static_cast<signed char>(source_value + dest_value); // Cast operands to unsigned values first, then store their sum inside a wider 32-bit int
+
         int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
-                   static_cast<int>(static_cast<unsigned char>(dest_value));
+                   static_cast<int>(static_cast<unsigned char>(dest_value)); //Convert from signed char to unsigned char, then convert to int and add it up.
+                   //If the number higher than 255, then carry bit occur.
 
-        bool overflowOccurred = (source_value > 0 && dest_value > 0 && signed_result < 0);
-        bool underflowOccurred = (source_value < 0 && dest_value && signed_result >= 0);
-
-        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+        bool overflowOccurred = (source_value > 0 && dest_value > 0 && signed_result < 0); //Addition of two positive number resultant negative means overflow occur.
+        bool underflowOccurred = (source_value < 0 && dest_value < 0 && signed_result >= 0); //Addition of two negative number resultant positive means underflow occur.
 
         cpu.getFlags()->setCF(unsigned_result > 255);
         cpu.getFlags()->setUF(underflowOccurred);
         cpu.getFlags()->setOF(overflowOccurred);
         cpu.getFlags()->setZF(signed_result == 0);
+        cpu.setReg(dest_index, static_cast<signed char>(signed_result));
     }
 };
 
@@ -637,20 +637,22 @@ public:
 
     void execute(CPU& cpu)
     {
-        int source_index = get_source_reg();
+        int source_index = get_source_reg(); //Get the index of the register.
         int dest_index = get_destination_reg();
 
-        signed char source_value = cpu.getReg(source_index);
+        signed char source_value = cpu.getReg(source_index); //Get the value through cpu member function
         signed char dest_value = cpu.getReg(dest_index);
 
-        int signed_result = int(dest_value) - int(source_value);
+        signed char signed_result = static_cast<signed char>(dest_value - source_value); // Cast operands to unsigned values first, then store their subtract inside a wider 32-bit int
 
-        int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
-                   static_cast<int>(static_cast<unsigned char>(dest_value));
+        int unsigned_result = static_cast<int>(static_cast<unsigned char>(dest_value)) - static_cast<int>(static_cast<unsigned char>(source_value));
+
+        bool overflowOccurred = (dest_value > 0 && source_value < 0 && signed_result < 0); //Subtraction of two positive number resultant positive means overflow occur.
+        bool underflowOccurred = (dest_value < 0 && source_value > 0 && signed_result >= 0); //Subtraction of two positive number resultant negative means underflow occur.
 
         cpu.getFlags()->setCF(unsigned_result > 255);
-        cpu.getFlags()->setUF(signed_result < -128);
-        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setUF(underflowOccurred);
+        cpu.getFlags()->setOF(overflowOccurred);
         cpu.getFlags()->setZF(signed_result == 0);
 
         cpu.setReg(dest_index, static_cast<signed char>(signed_result));
@@ -670,14 +672,16 @@ public:
         signed char source_value = cpu.getReg(source_index);
         signed char dest_value = cpu.getReg(dest_index);
 
-        int signed_result = int(dest_value) * int(source_value);
+        signed char signed_result = static_cast<signed char>(dest_value * source_value); // Cast operands to unsigned values first, then store their subtract inside a wider 32-bit int
 
-        int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
-                   static_cast<int>(static_cast<unsigned char>(dest_value));
+        int unsigned_result = static_cast<int>(static_cast<unsigned char>(dest_value)) * static_cast<int>(static_cast<unsigned char>(source_value));
+
+        bool overflowOccurred = (int(dest_value) * int(source_value) > 127); //In byte, any multiplication make number larger than 127. it is overflow.
+        bool underflowOccurred = (int(dest_value) * int(source_value) <= -128); //else, it is underflow.
 
         cpu.getFlags()->setCF(unsigned_result > 255);
-        cpu.getFlags()->setUF(signed_result < -128);
-        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setUF(underflowOccurred);
+        cpu.getFlags()->setOF(overflowOccurred);
         cpu.getFlags()->setZF(signed_result == 0);
 
         cpu.setReg(dest_index, static_cast<signed char>(signed_result));
@@ -702,14 +706,16 @@ public:
             return;
         }
 
-        int signed_result = int(dest_value) / int(source_value) ;
+        signed char signed_result = static_cast<signed char>(dest_value / source_value); // Cast operands to unsigned values first, then store their subtract inside a wider 32-bit int
 
-        int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
-                   static_cast<int>(static_cast<unsigned char>(dest_value));
+        int unsigned_result = static_cast<int>(static_cast<unsigned char>(dest_value)) / static_cast<int>(static_cast<unsigned char>(source_value));
+        //Division of two number only make the resultant closer to 0, so it is impossible to overflow.
+        //Unless it -128 / -1 = 128.
+        bool overflowOccurred = (dest_value == -128 && source_value == -1);
+        //underflow dont occur during division since division bring the result closer to 0.
 
         cpu.getFlags()->setCF(unsigned_result > 255);
-        cpu.getFlags()->setUF(signed_result < -128);
-        cpu.getFlags()->setOF(signed_result > 127);
+        cpu.getFlags()->setOF(overflowOccurred);
         cpu.getFlags()->setZF(signed_result == 0);
 
         cpu.setReg(dest_index, static_cast<signed char>(signed_result));
@@ -1177,6 +1183,16 @@ public:
         string opcode = cleanLine.substr(0, spacePos);
         string args = trim(cleanLine.substr(spacePos + 1));
 
+        //This is a safeguard if a opcode is not including in the rubric, the program will exit gracefully.
+        if (opcode != "MOV" && opcode != "ADD" && opcode != "SUB" && opcode != "MUL" &&
+            opcode != "DIV" && opcode != "INC" && opcode != "DEC" && opcode != "INPUT" &&
+            opcode != "DISPLAY" && opcode != "SHL" && opcode != "SHR" && opcode != "ROL" &&
+            opcode != "ROR" && opcode != "LOAD" && opcode != "STORE" && opcode != "PUSH" &&
+            opcode != "POP" && opcode != "RESET") {
+            std::cerr << "Invalid Instruction Encountered: " << opcode << "\n";
+            std::exit(1); // Stop execution immediately to fulfill safety criteria
+        }
+
         if (spacePos == string::npos) {
             string cmd = trim(cleanLine);
             if (cmd == "RESET") return new RESET(args[0]);
@@ -1214,7 +1230,7 @@ public:
         if (opcode == "SHR")   return new SftOperation(first[1] - '0', stoi(second), 1);
 
         if (opcode == "MOV") {
-            cout << first << " " << second << endl;
+            //cout << first << " " << second << endl;
             if (second[0] == 'R') return new MovOperation(first[1] - '0', second[1] - '0');
             if (second[0] == '[') return new MovOperation(first[1] - '0', second[2] - '0', 0);
             return new MovOperation(first[1] - '0', (signed char)stoi(second));
@@ -1251,8 +1267,9 @@ public:
             // Otherwise it's a direct memory address (e.g., 10)
             else {return new STORE(srcReg, stoi(second));}
             }
+        return nullptr;
         }
-    };
+};
 
 // 4.3: Runner
 // Written by: Wong Haw Jack
@@ -1370,31 +1387,31 @@ public:
     }
 };
 
-int main()
+int main(int argc, char* argv[])
 {
-    std::cout << "========================================" << std::endl;
-    std::cout << "      VIRTUAL MACHINE RUNNER BOOT       " << std::endl;
-    std::cout << "========================================" << std::endl;
+//    std::cout << "========================================" << std::endl;
+//    std::cout << "      VIRTUAL MACHINE RUNNER BOOT       " << std::endl;
+//    std::cout << "========================================" << std::endl;
+
+    //To check user provide file name.
+    if (argc < 2) {
+        std::cerr << "Error: Missing input file.\n";
+        std::cerr << "Usage: " << argv[0] << " <filename.asm>\n";
+        return 1;
+    }
+    //Extract the filename from the argument vector
+    std::string programFile = argv[1];
 
     CPU myCpu;
     Runner vmInterpreter;
 
-    // Provide your objective .asm program file location here
-    std::string programFile = "test_case2.asm";
+    //std::cout << "Loading: " << programFile << "..." << std::endl;
 
-    std::cout << "Loading: " << programFile << "..." << std::endl;
-
-    if (vmInterpreter.loadProgram(programFile)) {
-        std::cout << "Program loaded successfully. Running execution loop..." << std::endl;
-
-        // Kick off your core execution engine loop!
-        vmInterpreter.run(myCpu, programFile);
-
-        std::cout << "Program completed execution processing state." << std::endl;
-    }
-    else {
+    if (!vmInterpreter.loadProgram(programFile)) {
         std::cerr << "Initialization Error: Unable to extract valid program instructions." << std::endl;
+        return 1;
     }
+    vmInterpreter.run(myCpu, programFile);
 
     return 0;
 }
