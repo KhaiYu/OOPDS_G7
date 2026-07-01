@@ -22,6 +22,7 @@ This program strictly follow below program structure:
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -164,10 +165,10 @@ private:
     int capacity; // current array capacity / maximum number of elements the array can store
     void resize()
         {
-            int newCapacity;  // store the new array size 
+            int newCapacity;  // store the new array size
 
             if (capacity == 0)
-                newCapacity = 1;   // first allocation, create array of size 1 
+                newCapacity = 1;   // first allocation, create array of size 1
             else
                 newCapacity = capacity * 2;   // double the current capacity (e.g: 4 to 8)
 
@@ -177,17 +178,17 @@ private:
 
             for (int i = frontIndex; i <= rearIndex; i++)   // Copy all queue elements
             {
-                temp[j] = data[i];  // copy one element 
+                temp[j] = data[i];  // copy one element
                 j++;   // move to the next position
             }
 
             delete[] data;   //delete the old array to free the old meomory
 
-            data = temp; // data now points to the new array 
+            data = temp; // data now points to the new array
 
             frontIndex = 0;  // reset front to index 0
 
-            rearIndex = j - 1;  // rear becomes the last copied element 
+            rearIndex = j - 1;  // rear becomes the last copied element
 
             capacity = newCapacity;  //update the new capacity
         }
@@ -195,7 +196,7 @@ private:
 public:
     MyQueue()  //constructor
     {
-        data = nullptr;   //no memory allocated yet 
+        data = nullptr;   //no memory allocated yet
         frontIndex = 0;  //front start at index 0
         rearIndex = -1;  //no element exists (queue is empty)
         capacity = 0;  //no storage yet
@@ -213,13 +214,13 @@ public:
 
     int size()
     {
-        return rearIndex - frontIndex + 1;  //calculate number of elements 
+        return rearIndex - frontIndex + 1;  //calculate number of elements
     }
 
     void enqueue (T value)
     {
         if (rearIndex + 1 >= capacity)  //check whether there is enough space - is the array full?
-            resize();  //if yes, create a bigger array 
+            resize();  //if yes, create a bigger array
 
         rearIndex++;  //move rear to the next position
 
@@ -230,7 +231,7 @@ public:
     {
         if (empty())
         {
-            std::cout << "Queue is empty!" << std::endl;  //display error message 
+            std::cout << "Queue is empty!" << std::endl;  //display error message
             exit(1);  //stop the program
         }
         return data[frontIndex++];  //return the front element, then move frontIndex forward(Take the first item and remove it from the queue)
@@ -238,9 +239,9 @@ public:
 
     T front()
     {
-        if (empty())  // check if queue is empty 
+        if (empty())  // check if queue is empty
         {
-            std::cout << "Queue is empty!" << std::endl;  //display error message 
+            std::cout << "Queue is empty!" << std::endl;  //display error message
             exit(1);  // stop the program
         }
 
@@ -276,7 +277,7 @@ public:
     }
 
     // Method to read register data
-    signed char const getValue()
+    signed char getValue() const
     {
         return value;
     }
@@ -304,8 +305,17 @@ public:
 };
 
 // 2.2: Program Counter
-// Written by:
-class ProgramCounter{};
+// Written by: Wong Haw Jack
+class ProgramCounter {
+private:
+    unsigned char value; // 1-byte wide tracking counter
+public:
+    ProgramCounter() : value(0) {} // Initialize the counter by 0
+    void increment() { value++; } // Increment by 1
+    // Setter-getter function for program counter
+    void setValue(unsigned char val) { value = val; }
+    unsigned char getValue() const { return value; }
+};
 
 // 2.3: Flags
 // Written by: Tan Khai Yu
@@ -435,6 +445,10 @@ public:
         stack_index.pop();
         return stack.pop();
     }
+
+    unsigned char getPC() const { return pc.getValue(); } // Function for getting data in program counter.
+    void incrementPC() { pc.increment(); } // Function for update program counter.
+    void setPC(unsigned char val) { pc.setValue(val); } // Function for setting program counter.
 };
 // Forward declaration;
 //*****************************************************************
@@ -482,8 +496,7 @@ public:
         int input;
         std::cout << "?" << std::endl;
         std::cin >> input;
-        static_cast<signed char>(input);
-        cpu.setReg(register_index, input);
+        cpu.setReg(register_index, static_cast<signed char>(input));
         if(input > 127) {cpu.getFlags()->setOF(true);}
         else if(input < -128) {cpu.getFlags()->setUF(true);}
         else if(input == 0) {cpu.getFlags()->setZF(true);}
@@ -500,7 +513,7 @@ public:
     }
     void execute(CPU& cpu) override
     {
-        std::cout << int(cpu.getReg(register_index));
+        std::cout << int(cpu.getReg(register_index)) << endl;
     }
 };
 // 3.4: MOV Operations
@@ -600,19 +613,20 @@ public:
         signed char source_value = cpu.getReg(source_index);
         signed char dest_value = cpu.getReg(dest_index);
 
-        int signed_result = int(source_value) + int(dest_value);
+        signed char signed_result = static_cast<signed char>(source_value + dest_value);
+        // Cast operands to unsigned values first, then store their sum inside a wider 32-bit int
+        int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
+                   static_cast<int>(static_cast<unsigned char>(dest_value));
 
-        unsigned char u_source_value = (unsigned char)source_value;
-        unsigned char u_dest_value = (unsigned char)dest_value;
-
-        unsigned char unsigned_result = u_dest_value + u_source_value;
-
-        cpu.getFlags()->setCF(unsigned_result > 255);
-        cpu.getFlags()->setUF(signed_result < -128);
-        cpu.getFlags()->setOF(signed_result > 127);
-        cpu.getFlags()->setZF(signed_result == 0);
+        bool overflowOccurred = (source_value > 0 && dest_value > 0 && signed_result < 0);
+        bool underflowOccurred = (source_value < 0 && dest_value && signed_result >= 0);
 
         cpu.setReg(dest_index, static_cast<signed char>(signed_result));
+
+        cpu.getFlags()->setCF(unsigned_result > 255);
+        cpu.getFlags()->setUF(underflowOccurred);
+        cpu.getFlags()->setOF(overflowOccurred);
+        cpu.getFlags()->setZF(signed_result == 0);
     }
 };
 
@@ -631,10 +645,8 @@ public:
 
         int signed_result = int(dest_value) - int(source_value);
 
-        unsigned char u_source_value = (unsigned char)source_value;
-        unsigned char u_dest_value = (unsigned char)dest_value;
-
-        unsigned char unsigned_result = u_dest_value - u_source_value;
+        int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
+                   static_cast<int>(static_cast<unsigned char>(dest_value));
 
         cpu.getFlags()->setCF(unsigned_result > 255);
         cpu.getFlags()->setUF(signed_result < -128);
@@ -660,10 +672,8 @@ public:
 
         int signed_result = int(dest_value) * int(source_value);
 
-        unsigned char u_source_value = (unsigned char)source_value;
-        unsigned char u_dest_value = (unsigned char)dest_value;
-
-        unsigned char unsigned_result = u_dest_value * u_source_value;
+        int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
+                   static_cast<int>(static_cast<unsigned char>(dest_value));
 
         cpu.getFlags()->setCF(unsigned_result > 255);
         cpu.getFlags()->setUF(signed_result < -128);
@@ -687,12 +697,15 @@ public:
         signed char source_value = cpu.getReg(source_index);
         signed char dest_value = cpu.getReg(dest_index);
 
+        if (source_value == 0) {
+            std::cerr << "Runtime Error: Division by zero!" << std::endl;
+            return;
+        }
+
         int signed_result = int(dest_value) / int(source_value) ;
 
-        unsigned char u_source_value = (unsigned char)source_value;
-        unsigned char u_dest_value = (unsigned char)dest_value;
-
-        unsigned char unsigned_result =  u_dest_value / u_source_value ;
+        int unsigned_result = static_cast<int>(static_cast<unsigned char>(source_value)) +
+                   static_cast<int>(static_cast<unsigned char>(dest_value));
 
         cpu.getFlags()->setCF(unsigned_result > 255);
         cpu.getFlags()->setUF(signed_result < -128);
@@ -876,7 +889,6 @@ public:
     }
 };
 // 3.9: Shift Operations
-// 3.9: Shift Operations
 // Written By: Tan Yi Da
 class SftOperation : public Instruction
 {
@@ -1011,7 +1023,7 @@ private:
     int sourceReg;
 
 public:
-    STORE_INDIRECT(int a, int s)
+    STORE_INDIRECT(int s, int a)
     {
         addrReg = a;
         sourceReg = s;
@@ -1030,8 +1042,6 @@ public:
         cpu.writeMemory(address, cpu.getReg(sourceReg));
     }
 };
-
-
 
 // 3.11: Flag Reset Instruction
 // Written by: Tan Khai Yu
@@ -1059,90 +1069,6 @@ public:
 };
 
 // 3.12: Stack Operations
-// 3.13： Parser Class
-//Writen by : Tan Yi Da
-
-class Parser {
-private:
-    string line;
-    string ins;
-
-    string trim(const string& str) {
-        size_t first = str.find_first_not_of(" \t\r\n");
-        if (first == string::npos) return "";
-        size_t last = str.find_last_not_of(" \t\r\n");
-        return str.substr(first, (last - first + 1));
-    }
-
-public:
-    Parser() {
-        line = " ";
-        ins = " ";
-    }
-
-    Instruction* parseLine(const string& inputLine) {
-        size_t spacePos = inputLine.find_first_of(" \t");
-
-        if (spacePos == string::npos) {
-            string cmd = trim(inputLine);
-            if (cmd == "RESET") return new RESET();
-            return nullptr;
-        }
-
-        string opcode = inputLine.substr(0, spacePos);
-        string args = trim(inputLine.substr(spacePos + 1));
-
-        size_t commaPos = args.find(',');
-
-        if (commaPos == string::npos) {
-            if (opcode == "INPUT")   return new INPUT(args[1] - '0');
-            if (opcode == "POP")     return new POP(args[1] - '0');
-            if (opcode == "INC")     return new INC(args[1] - '0');
-            if (opcode == "DEC")     return new DEC(args[1] - '0');
-
-            if (opcode == "PUSH") {
-                if (args[0] == 'R') return new PUSH_REG(args[1] - '0');
-                return new PUSH_NUM((signed char)stoi(args));
-            }
-            if (opcode == "DISPLAY") {
-                if (args[0] == '[') return new DISPLAY_MEM(stoi(args.substr(1, args.length() - 2)));
-                return new DISPLAY_REG(args[1] - '0');
-            }
-            return nullptr;
-        }
-
-        string first = trim(args.substr(0, commaPos));
-        string second = trim(args.substr(commaPos + 1));
-
-        if (opcode == "ADD")   return new ADD(first[1] - '0', second[1] - '0');
-        if (opcode == "SUB")   return new SUB(first[1] - '0', second[1] - '0');
-        if (opcode == "MUL")   return new MUL(first[1] - '0', second[1] - '0');
-        if (opcode == "DIV")   return new DIV(first[1] - '0', second[1] - '0');
-        if (opcode == "ROL")   return new ROL(first[1] - '0', stoi(second));
-        if (opcode == "ROR")   return new ROR(first[1] - '0', stoi(second));
-        if (opcode == "SHL")   return new SftOperation(first[1] - '0', stoi(second), 0);
-        if (opcode == "SHR")   return new SftOperation(first[1] - '0', stoi(second), 1);
-
-        if (opcode == "MOV") {
-            if (second[0] == 'R') return new MovOperation(first[1] - '0', second[1] - '0');
-            if (second[0] == '[') return new MovOperation(first[1] - '0', second[2] - '0', 0);
-            return new MovOperation(first[1] - '0', (signed char)stoi(second));
-        }
-
-        if (opcode == "LOAD") {
-            if (second[1] == 'R') return new LOAD_INDIRECT(first[1] - '0', second[2] - '0');
-            return new LOAD(first[1] - '0', stoi(second.substr(1, second.length() - 2)));
-        }
-
-        if (opcode == "STORE") {
-            int srcReg = second[1] - '0';
-            if (first[1] == 'R') return new STORE_INDIRECT(first[2] - '0', srcReg);
-            return new STORE(srcReg, stoi(first.substr(1, first.length() - 2)));
-        }
-
-        return nullptr;
-    }
-};
 // Written by: Tan Khai Yu
 // PUSH: Stores a register's value onto the stack
 class PUSH : public Instruction
@@ -1176,7 +1102,10 @@ public:
     }
 };
 
-// 3.13: File Reader 
+//*****************************************************************
+//                       SECTION 4: Runner
+//*****************************************************************
+// 4.1: File Reader
 // Written by: Chen Chee Chuen
 // Reads an assembly(.asm) file line by line and storeseach instruction into the custom queue
 class FileReader
@@ -1192,7 +1121,7 @@ public:
             return;  //stop function if file cannot be opened
         }
 
-        std::string line;  //temporary variable to store each line from file 
+        std::string line;  //temporary variable to store each line from file
 
         while(getline(fin, line))  //read file line by line until EOF
         {
@@ -1202,205 +1131,270 @@ public:
             }
 
             instructionQueue.enqueue(line);  //store instruction into queue (FIFO order)
+            //cout << "Debug: " << line << endl;
         }
 
         fin.close(); //close the file after reading and free the file resources
     }
 };
 
-//*****************************************************************
-//                       SECTION 4: Runner
-//*****************************************************************
+// 4.2： Parser Class
+//Writen by : Tan Yi Da
 
-    /***
-    Below is just for bug testing!!!
-    These are NOT actual code.
-    Feel free to make changes for debugging purpose.
-    ***/
+class Parser {
+private:
+    string line;
+    string ins;
+
+    string trim(const string& str) {
+        size_t first = str.find_first_not_of(" \t\r\n");
+        if (first == string::npos) return "";
+        size_t last = str.find_last_not_of(" \t\r\n");
+        return str.substr(first, (last - first + 1));
+    }
+
+public:
+    Parser() {
+        line = "";
+        ins = "";
+    }
+
+    Instruction* parseLine(const string& inputLine) {
+        size_t commentPos = inputLine.find(';');
+
+        string cleanLine = inputLine;
+        if(commentPos != string::npos){
+            cleanLine = inputLine.substr(0, commentPos);
+        }
+
+        cleanLine = trim(cleanLine);
+
+        if(cleanLine.empty()){
+            return nullptr;
+        }
+
+        size_t spacePos = inputLine.find_first_of(" \t");
+        string opcode = cleanLine.substr(0, spacePos);
+        string args = trim(cleanLine.substr(spacePos + 1));
+
+        if (spacePos == string::npos) {
+            string cmd = trim(cleanLine);
+            if (cmd == "RESET") return new RESET(args[0]);
+            return nullptr;
+        }
+        size_t commaPos = args.find(',');
+
+        if (commaPos == string::npos) {
+            if (opcode == "INPUT")   return new Input(args[1] - '0');
+            if (opcode == "POP")     return new POP(args[1] - '0');
+            if (opcode == "INC")     return new INC(args[1] - '0');
+            if (opcode == "DEC")     return new DEC(args[1] - '0');
+
+            if (opcode == "PUSH") {
+                if (args[0] == 'R') return new PUSH(args[1] - '0');
+                return new PUSH((signed char)stoi(args));
+            }
+            if (opcode == "DISPLAY") {
+                if (args[0] == '[') return new Display(stoi(args.substr(1, args.length() - 2)));
+                return new Display(args[1] - '0');
+            }
+            return nullptr;
+        }
+
+        string first = trim(args.substr(0, commaPos));
+        string second = trim(args.substr(commaPos + 1));
+
+        if (opcode == "ADD")   return new ADD(first[1] - '0', second[1] - '0');
+        if (opcode == "SUB")   return new SUB(first[1] - '0', second[1] - '0');
+        if (opcode == "MUL")   return new MUL(first[1] - '0', second[1] - '0');
+        if (opcode == "DIV")   return new DIV(first[1] - '0', second[1] - '0');
+        if (opcode == "ROL")   return new ROL(first[1] - '0', stoi(second));
+        if (opcode == "ROR")   return new ROR(first[1] - '0', stoi(second));
+        if (opcode == "SHL")   return new SftOperation(first[1] - '0', stoi(second), 0);
+        if (opcode == "SHR")   return new SftOperation(first[1] - '0', stoi(second), 1);
+
+        if (opcode == "MOV") {
+            cout << first << " " << second << endl;
+            if (second[0] == 'R') return new MovOperation(first[1] - '0', second[1] - '0');
+            if (second[0] == '[') return new MovOperation(first[1] - '0', second[2] - '0', 0);
+            return new MovOperation(first[1] - '0', (signed char)stoi(second));
+        }
+
+        if (opcode == "LOAD")
+        {
+            int dstReg = first[1] - '0';
+            // Check if second argument is indirect [Rn] or direct [address]
+            if (second[1] == 'R')
+            {
+                // Remove the '[' and ']' characters before parsing
+                string addrPart = second.substr(1, second.length() - 2);
+                return new LOAD_INDIRECT(dstReg, addrPart[1] - '0');
+            }
+            // Otherwise it's a direct memory address (e.g., 10)
+            else
+                {
+                    string memAddr = second.substr(1, second.length() - 2);
+                    return new LOAD(dstReg, stoi(memAddr));
+                }
+        }
+
+        if (opcode == "STORE")
+            {
+            int srcReg = first[1] - '0';
+            // Check if second argument is indirect [Rn] or direct [address]
+            if (second[0] == '[')
+                {
+                // Remove the '[' and ']' characters before parsing
+                string addrPart = second.substr(1, second.length() - 2);
+                return new STORE_INDIRECT(srcReg, addrPart[1] - '0');
+                }
+            // Otherwise it's a direct memory address (e.g., 10)
+            else {return new STORE(srcReg, stoi(second));}
+            }
+        }
+    };
+
+// 4.3: Runner
+// Written by: Wong Haw Jack
+class Runner {
+private:
+    MyVector<Instruction*> compiledInstructions;
+    Parser lineParser;
+    FileReader asmReader;
+
+    // Helper to format 8-bit registers and memory outputs into 4-character padded blocks
+    void formatAndPrintByte(std::ostream& os, signed char val) const {
+        int intVal = static_cast<int>(val);
+        if (intVal >= 0) {
+            os << std::setw(4) << std::setfill('0') << intVal << "#";
+        } else {
+            // Replicates absolute sign value separation layout format safely
+            os << "-" << std::setw(3) << std::setfill('0') << (-intVal) << "#";
+        }
+    }
+
+    // Runner Memory Matrix Display
+    void printMemoryToConsole(std::ostream& os, CPU& cpu) const {
+        os << "#Memory#\n";
+        for (int row = 0; row < 8; ++row){
+            os << "#";
+            for (int col = 0; col < 8; ++col){
+                int address = (row * 8) + col;
+                int memVal = static_cast<int>(cpu.readMemory(address));
+                if(memVal >= 0){
+                    os <<std::setw(4) << std::setfill('0') << memVal << "#";
+                }
+                else{
+                    os << "-" << std::setw(3) << std::setfill('0') << (-memVal) << "#";
+                }
+            }
+            os << "\n";
+        }
+    }
+
+    //Virtual Machine Snapshot State Display
+    void dumpStateToConsole(std::ostream& os, CPU& cpu,int pcValue) const {
+        os << "#Begin#\n#Registers#";
+        for(int i = 0; i < 8; ++i){
+            int regVal = static_cast<int>(cpu.getReg(i));
+            if (regVal >= 0){
+                os << std::setw(4) << std::setfill('0') << regVal << "#";
+            }
+            else{
+                os << "-" << std::setw(3) << std::setfill('0') << (-regVal) << "#";
+            }
+        }
+        os << "\n";
+
+        FlagRegister* flags = cpu.getFlags();
+        os        << "#FLAGS#OF#" << flags -> getOF()
+                  << "#UF#" << flags -> getUF()
+                  << "#CF#" << flags -> getCF()
+                  << "#ZF#" << flags -> getZF() << "#\n";
+
+        os        << "#PC#" << std::setw(4) << std::setfill('0') << pcValue << "#\n";
+        printMemoryToConsole(os, cpu);
+        os        << "#End#\n";
+    }
+
+    void generateDump(std::ostream& os, CPU& cpu) const {
+        dumpStateToConsole(os, cpu, cpu.getPC());
+    }
+
+public:
+    Runner() {}
+
+    ~Runner() {
+        for (int i = 0; i < compiledInstructions.size(); i++) {
+            delete compiledInstructions[i];
+        }
+    }
+
+    bool loadProgram(const std::string& filename) {
+        MyQueue<std::string> rawLinesQueue;
+        asmReader.readFile(filename, rawLinesQueue);
+        if (rawLinesQueue.empty()) return false;
+
+        while (!rawLinesQueue.empty()) {
+            std::string currentLine = rawLinesQueue.dequeue();
+            Instruction* cmd = lineParser.parseLine(currentLine);
+            if (cmd != nullptr) {
+                compiledInstructions.push_back(cmd);
+            }
+        }
+        return compiledInstructions.size() > 0;
+    }
+
+    void run(CPU& cpu, string program_file) {
+        cpu.setPC(0); // Section 3 specs validation rule
+
+        while (cpu.getPC() < compiledInstructions.size()) {
+            int currentPC = cpu.getPC();
+            Instruction* currentInstruction = compiledInstructions[currentPC];
+            currentInstruction->execute(cpu);
+            cpu.incrementPC();
+        }
+
+        // --- EXECUTOR DUMP TRIGGER POINT ---
+        // 1. Output to Screen Console
+        generateDump(std::cout, cpu);
+
+        // 2. Output directly to the required text file dump on the drive
+        string output_file = program_file.substr(0, program_file.length() - 4);
+        output_file += "_result.txt";
+        std::ofstream fout(output_file);
+        if (fout) {
+            generateDump(fout, cpu);
+            fout.close();
+        }
+    }
+};
+
 int main()
 {
     std::cout << "========================================" << std::endl;
-    std::cout << " RUNNING VIRTUAL MACHINE TEST SUITE     " << std::endl;
+    std::cout << "      VIRTUAL MACHINE RUNNER BOOT       " << std::endl;
     std::cout << "========================================" << std::endl;
 
     CPU myCpu;
+    Runner vmInterpreter;
 
-    //---------------------------------------------------------
-    // TEST 1: Register Boundary & Explicit IO Flag Manipulations
-    //---------------------------------------------------------
-    {
-        std::cout << "\n[TEST 1] Testing IO boundaries & Flags..." << std::endl;
+    // Provide your objective .asm program file location here
+    std::string programFile = "test_case2.asm";
 
-        Instruction* inputNormal = new Input(0);
-        std::cout << "-> Enter '55' to test normal assignment:" << std::endl;
-        inputNormal->execute(myCpu);
+    std::cout << "Loading: " << programFile << "..." << std::endl;
 
-        Instruction* displayR0 = new Display(0);
-        std::cout << "Value inside R0 is: ";
-        displayR0->execute(myCpu);
-        std::cout << std::endl;
+    if (vmInterpreter.loadProgram(programFile)) {
+        std::cout << "Program loaded successfully. Running execution loop..." << std::endl;
 
-        Instruction* inputOverflow = new Input(1);
-        std::cout << "-> Enter '200' to test Overflow Flag trigger:" << std::endl;
-        inputOverflow->execute(myCpu);
+        // Kick off your core execution engine loop!
+        vmInterpreter.run(myCpu, programFile);
 
-        std::cout << "Overflow Flag (OF) state (Expected 1): " << myCpu.getFlags()->getOF() << std::endl;
-
-        delete inputNormal;
-        delete displayR0;
-        delete inputOverflow;
+        std::cout << "Program completed execution processing state." << std::endl;
     }
-
-    //---------------------------------------------------------
-    // TEST 2: Reset Flag Instruction
-    //---------------------------------------------------------
-    {
-        std::cout << "\n[TEST 2] Testing RESET instruction..." << std::endl;
-
-        Instruction* resetOF = new RESET('O');
-        resetOF->execute(myCpu);
-        std::cout << "Overflow Flag (OF) state after RESET (Expected 0): " << myCpu.getFlags()->getOF() << std::endl;
-
-        delete resetOF;
+    else {
+        std::cerr << "Initialization Error: Unable to extract valid program instructions." << std::endl;
     }
-
-    //---------------------------------------------------------
-    // TEST 3: Stack Operations (PUSH & POP)
-    //---------------------------------------------------------
-    {
-        std::cout << "\n[TEST 3] Testing Stack Operations..." << std::endl;
-
-        myCpu.setReg(2, 42);
-        myCpu.setReg(3, 0);
-
-        Instruction* pushR2 = new PUSH(2);
-        Instruction* popR3 = new POP(3);
-
-        pushR2->execute(myCpu);
-        popR3->execute(myCpu);
-
-        std::cout << "Value transferred to R3 via Stack (Expected 42): " << (int)myCpu.getReg(3) << std::endl;
-
-        delete pushR2;
-        delete popR3;
-    }
-
-    //---------------------------------------------------------
-    // TEST 4: Multiple PUSH/POP Operations (LIFO Order)
-    //---------------------------------------------------------
-    {
-        std::cout << "\n[TEST 4] Testing Multiple PUSH/POP (LIFO Order)..." << std::endl;
-
-        for(int i = 0; i < 8; i++) {
-            myCpu.setReg(i, 0);
-        }
-
-        myCpu.setReg(0, 10);
-        myCpu.setReg(1, 20);
-        myCpu.setReg(2, 30);
-        myCpu.setReg(3, 40);
-
-        std::cout << "Initial values: R0=10, R1=20, R2=30, R3=40" << std::endl;
-
-        Instruction* pushR0 = new PUSH(0);
-        Instruction* pushR1 = new PUSH(1);
-        Instruction* pushR2 = new PUSH(2);
-        Instruction* pushR3 = new PUSH(3);
-
-        pushR0->execute(myCpu);
-        pushR1->execute(myCpu);
-        pushR2->execute(myCpu);
-        pushR3->execute(myCpu);
-
-        std::cout << "Pushed: R0, R1, R2, R3 onto stack" << std::endl;
-
-        Instruction* popR4 = new POP(4);
-        Instruction* popR5 = new POP(5);
-        Instruction* popR6 = new POP(6);
-        Instruction* popR7 = new POP(7);
-
-        popR4->execute(myCpu);
-        popR5->execute(myCpu);
-        popR6->execute(myCpu);
-        popR7->execute(myCpu);
-
-        std::cout << "Popped into R4,R5,R6,R7 (Expected LIFO: 40,30,20,10)" << std::endl;
-        std::cout << "Result: R4=" << (int)myCpu.getReg(4)
-                  << " R5=" << (int)myCpu.getReg(5)
-                  << " R6=" << (int)myCpu.getReg(6)
-                  << " R7=" << (int)myCpu.getReg(7) << std::endl;
-
-        bool lifoCorrect = ((int)myCpu.getReg(4) == 40 &&
-                            (int)myCpu.getReg(5) == 30 &&
-                            (int)myCpu.getReg(6) == 20 &&
-                            (int)myCpu.getReg(7) == 10);
-
-        if(lifoCorrect) {
-            std::cout << " LIFO order test PASSED!" << std::endl;
-        } else {
-            std::cout << " LIFO order test FAILED!" << std::endl;
-        }
-
-        delete pushR0;
-        delete pushR1;
-        delete pushR2;
-        delete pushR3;
-        delete popR4;
-        delete popR5;
-        delete popR6;
-        delete popR7;
-    }
-
-    //---------------------------------------------------------
-    // TEST 5: Reset ALL Flags (C, Z, U, O)
-    //---------------------------------------------------------
-    {
-        std::cout << "\n[TEST 5] Testing RESET on all flag types..." << std::endl;
-
-        FlagRegister* flags = myCpu.getFlags();
-
-        flags->setCF(true);
-        flags->setZF(true);
-        flags->setUF(true);
-        flags->setOF(true);
-
-        std::cout << "Before RESET - CF:" << flags->getCF()
-                  << " ZF:" << flags->getZF()
-                  << " UF:" << flags->getUF()
-                  << " OF:" << flags->getOF() << " (Expected: 1 1 1 1)" << std::endl;
-
-        Instruction* resetCF = new RESET('C');
-        Instruction* resetZF = new RESET('Z');
-        Instruction* resetUF = new RESET('U');
-        Instruction* resetOF2 = new RESET('O');
-
-        resetCF->execute(myCpu);
-        std::cout << "After RESET 'C' - CF:" << flags->getCF() << " (Expected: 0)" << std::endl;
-
-        resetZF->execute(myCpu);
-        std::cout << "After RESET 'Z' - ZF:" << flags->getZF() << " (Expected: 0)" << std::endl;
-
-        resetUF->execute(myCpu);
-        std::cout << "After RESET 'U' - UF:" << flags->getUF() << " (Expected: 0)" << std::endl;
-
-        resetOF2->execute(myCpu);
-        std::cout << "After RESET 'O' - OF:" << flags->getOF() << " (Expected: 0)" << std::endl;
-
-        if(!flags->getCF() && !flags->getZF() && !flags->getUF() && !flags->getOF()) {
-            std::cout << " All flags reset successfully!" << std::endl;
-        } else {
-            std::cout << " Flag reset test FAILED!" << std::endl;
-        }
-
-        delete resetCF;
-        delete resetZF;
-        delete resetUF;
-        delete resetOF2;
-    }
-
-    std::cout << "\n========================================" << std::endl;
-    std::cout << " TEST SUITE COMPLETE                     " << std::endl;
-    std::cout << "========================================" << std::endl;
 
     return 0;
 }
